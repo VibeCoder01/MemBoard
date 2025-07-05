@@ -42,7 +42,14 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 
-const initialMessages = [
+type Message = {
+  id: number;
+  content: string;
+  schedule: string;
+  status: string;
+};
+
+const initialMessages: Message[] = [
   {
     id: 1,
     content: 'Welcome to our facility. We are glad to have you.',
@@ -64,8 +71,11 @@ const initialMessages = [
 ];
 
 export default function MessagesPage() {
-  const [messages, setMessages] = useState(initialMessages);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+
   const [newContent, setNewContent] = useState('');
   const [newSchedule, setNewSchedule] = useState('');
 
@@ -75,7 +85,7 @@ export default function MessagesPage() {
       return;
     }
 
-    const newMessage = {
+    const newMessage: Message = {
       id: Date.now(),
       content: newContent,
       schedule: newSchedule || 'Always Active',
@@ -86,11 +96,36 @@ export default function MessagesPage() {
 
     setNewContent('');
     setNewSchedule('');
-    setIsDialogOpen(false);
+    setIsAddDialogOpen(false);
   };
 
   const handleDeleteMessage = (id: number) => {
     setMessages((prevMessages) => prevMessages.filter((msg) => msg.id !== id));
+  };
+
+  const handleEditClick = (message: Message) => {
+    setEditingMessage({ ...message }); // Create a copy to edit
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdateMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMessage) return;
+
+    setMessages((prevMessages) =>
+      prevMessages.map((msg) =>
+        msg.id === editingMessage.id ? editingMessage : msg
+      )
+    );
+    setIsEditDialogOpen(false);
+    setEditingMessage(null);
+  };
+  
+  const handleEditDialogChange = (open: boolean) => {
+    setIsEditDialogOpen(open);
+    if (!open) {
+      setEditingMessage(null);
+    }
   };
 
   return (
@@ -99,7 +134,7 @@ export default function MessagesPage() {
         <h1 className="text-3xl font-bold tracking-tight font-headline">
           Message Management
         </h1>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
             <Button>
               <PlusCircle className="mr-2 h-4 w-4" />
@@ -138,12 +173,65 @@ export default function MessagesPage() {
                 </div>
               </div>
               <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
                 <Button type="submit">Save Message</Button>
               </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
       </div>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={handleEditDialogChange}>
+        <DialogContent className="sm:max-w-md">
+          <form onSubmit={handleUpdateMessage}>
+            <DialogHeader>
+              <DialogTitle>Edit Message</DialogTitle>
+              <DialogDescription>
+                Update the details for the message.
+              </DialogDescription>
+            </DialogHeader>
+            {editingMessage && (
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-content">Message Content</Label>
+                  <Textarea
+                    id="edit-content"
+                    value={editingMessage.content}
+                    onChange={(e) =>
+                      setEditingMessage({
+                        ...editingMessage,
+                        content: e.target.value,
+                      })
+                    }
+                    placeholder="Type your message here."
+                    required
+                    rows={5}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-schedule">Schedule (Optional)</Label>
+                  <Input
+                    id="edit-schedule"
+                    value={editingMessage.schedule}
+                    onChange={(e) =>
+                      setEditingMessage({
+                        ...editingMessage,
+                        schedule: e.target.value,
+                      })
+                    }
+                    placeholder="e.g., Always Active, or 2024-08-15"
+                  />
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => handleEditDialogChange(false)}>Cancel</Button>
+              <Button type="submit">Save Changes</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      
       <Card>
         <CardHeader>
           <CardTitle>Scheduled Messages</CardTitle>
@@ -171,7 +259,7 @@ export default function MessagesPage() {
                   <TableCell>{msg.schedule}</TableCell>
                   <TableCell>{msg.status}</TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" onClick={() => handleEditClick(msg)}>
                       Edit
                     </Button>
                     <AlertDialog>
