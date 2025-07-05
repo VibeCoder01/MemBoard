@@ -160,6 +160,9 @@ export function DisplayBoard() {
     }
     
     setDisplayQueue(finalQueue);
+    if (finalQueue.length > 0) {
+      setCurrentItem(finalQueue[0]);
+    }
     setIsLoading(false);
   }, []);
 
@@ -167,10 +170,15 @@ export function DisplayBoard() {
   useEffect(() => {
     if (isLoading || displayQueue.length === 0) return;
 
-    const item = displayQueue[currentIndex];
+    // The currentItem is now set in the initial useEffect.
+    // This effect is now only for advancing to the next item.
+    const item = currentItem || displayQueue[0];
     if (!item) return;
-
-    setCurrentItem(item);
+    
+    // If currentItem isn't set yet, set it. This handles the very first load.
+    if (!currentItem) {
+      setCurrentItem(item);
+    }
 
     const nextItemTimeout = setTimeout(() => {
       setCurrentIndex((prevIndex) => (prevIndex + 1) % displayQueue.length);
@@ -179,7 +187,14 @@ export function DisplayBoard() {
     return () => {
       clearTimeout(nextItemTimeout);
     };
-  }, [currentIndex, displayQueue, isLoading]);
+  }, [currentIndex, displayQueue, isLoading, currentItem]);
+
+  // Update current item when index changes
+  useEffect(() => {
+    if (!isLoading && displayQueue.length > 0) {
+      setCurrentItem(displayQueue[currentIndex]);
+    }
+  }, [currentIndex, isLoading, displayQueue]);
 
 
   const renderItem = () => {
