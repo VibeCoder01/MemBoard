@@ -1,7 +1,8 @@
+
 'use client';
 
 import Image from 'next/image';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -50,6 +51,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const initialPhotoGroups = {
   family: [
@@ -109,11 +111,44 @@ type PhotoGroups = {
 
 export default function PhotosPage() {
   const { toast } = useToast();
-  const [photoGroups, setPhotoGroups] =
-    useState<PhotoGroups>(initialPhotoGroups);
-  const [activeTab, setActiveTab] = useState(
-    Object.keys(initialPhotoGroups)[0]
-  );
+  const [isLoading, setIsLoading] = useState(true);
+  const [photoGroups, setPhotoGroups] = useState<PhotoGroups>({});
+  const [activeTab, setActiveTab] = useState('');
+
+  // Load from localStorage on component mount
+  useEffect(() => {
+    try {
+      const savedGroups = localStorage.getItem('photoGroups');
+      if (savedGroups && savedGroups !== '{}') {
+        setPhotoGroups(JSON.parse(savedGroups));
+      } else {
+        setPhotoGroups(initialPhotoGroups);
+      }
+    } catch (error) {
+      console.error('Failed to load photo groups from localStorage', error);
+      setPhotoGroups(initialPhotoGroups);
+    }
+    setIsLoading(false);
+  }, []);
+
+  // Save to localStorage whenever photoGroups changes
+  useEffect(() => {
+    if (!isLoading) {
+      localStorage.setItem('photoGroups', JSON.stringify(photoGroups));
+    }
+  }, [photoGroups, isLoading]);
+
+  // Keep activeTab in sync with available categories
+  useEffect(() => {
+    if (!isLoading) {
+      const categories = Object.keys(photoGroups);
+      if (categories.length > 0 && !categories.includes(activeTab)) {
+        setActiveTab(categories[0]);
+      } else if (categories.length === 0) {
+        setActiveTab('');
+      }
+    }
+  }, [photoGroups, isLoading, activeTab]);
 
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -124,7 +159,6 @@ export default function PhotosPage() {
   const [newPhotoCategory, setNewPhotoCategory] = useState(activeTab);
   const [editingPhotoCategory, setEditingPhotoCategory] = useState(activeTab);
 
-  // State for category management
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [newCategoryInput, setNewCategoryInput] = useState('');
   const [renamingCategory, setRenamingCategory] = useState<{
@@ -169,7 +203,6 @@ export default function PhotosPage() {
       if (fileInput) fileInput.value = '';
 
       setNewPhotoAlt('');
-      setNewPhotoCategory(activeTab);
       setIsUploadDialogOpen(false);
     };
     reader.readAsDataURL(newPhotoFile);
@@ -201,16 +234,14 @@ export default function PhotosPage() {
     if (!editingPhoto) return;
 
     setPhotoGroups((prev) => {
-      const newGroups = JSON.parse(JSON.stringify(prev)); // Deep copy to avoid mutation issues
+      const newGroups = JSON.parse(JSON.stringify(prev));
 
-      // Remove photo from all categories first
       for (const category in newGroups) {
         newGroups[category] = newGroups[category].filter(
           (p: Photo) => p.id !== editingPhoto.id
         );
       }
 
-      // Add updated photo to the new category
       if (!newGroups[editingPhotoCategory]) {
         newGroups[editingPhotoCategory] = [];
       }
@@ -258,7 +289,6 @@ export default function PhotosPage() {
       return;
     }
 
-    // Deselect tab if it's the one being deleted
     if (activeTab === categoryName) {
       const remainingCategories = Object.keys(photoGroups).filter(
         (c) => c !== categoryName
@@ -301,19 +331,57 @@ export default function PhotosPage() {
 
     setPhotoGroups((prev) => {
       const newGroups = { ...prev };
-      // A more robust way to rename a key while preserving order
       const entries = Object.entries(newGroups);
       const index = entries.findIndex(([key]) => key === oldName);
-      entries[index][0] = trimmedNewName;
-      return Object.fromEntries(entries);
+      if (index !== -1) {
+          const photos = newGroups[oldName];
+          delete newGroups[oldName];
+          const newEntries = [
+              ...entries.slice(0, index),
+              [trimmedNewName, photos],
+              ...entries.slice(index + 1),
+          ];
+          return Object.fromEntries(newEntries);
+      }
+      return newGroups;
     });
-
+    
     if (activeTab === oldName) {
       setActiveTab(trimmedNewName);
     }
 
     setRenamingCategory(null);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex-1 space-y-4">
+        <div className="flex items-center justify-between space-y-2">
+          <Skeleton className="h-9 w-64" />
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-10 w-44" />
+            <Skeleton className="h-10 w-40" />
+          </div>
+        </div>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-7 w-48" />
+            <Skeleton className="h-4 w-96" />
+          </CardHeader>
+          <CardContent>
+            <div className="flex space-x-4 border-b pb-4">
+              <Skeleton className="h-10 w-24" />
+              <Skeleton className="h-10 w-24" />
+              <Skeleton className="h-10 w-24" />
+            </div>
+            <div className="py-12 text-center text-muted-foreground">
+              <p>Loading photo library...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 space-y-4">
@@ -377,6 +445,12 @@ export default function PhotosPage() {
                             }
                             className="h-8"
                             autoFocus
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleRenameCategory();
+                                }
+                            }}
                           />
                           <Button size="sm" onClick={handleRenameCategory}>
                             Save
