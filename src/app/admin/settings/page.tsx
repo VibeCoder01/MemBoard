@@ -21,6 +21,9 @@ type Settings = {
   blankDuration: number;
   randomize: boolean;
   scrollSpeed: number;
+  randomizeAllPhotos: boolean;
+  randomizeInPhotoGroups: boolean;
+  messageFontSize: number;
 };
 
 const defaultSettings: Settings = {
@@ -29,6 +32,9 @@ const defaultSettings: Settings = {
   blankDuration: 3,
   randomize: false,
   scrollSpeed: 50,
+  randomizeAllPhotos: false,
+  randomizeInPhotoGroups: true,
+  messageFontSize: 48,
 };
 
 export default function SettingsPage() {
@@ -39,7 +45,7 @@ export default function SettingsPage() {
     try {
       const savedSettings = localStorage.getItem('displaySettings');
       if (savedSettings) {
-        setSettings(JSON.parse(savedSettings));
+        setSettings({ ...defaultSettings, ...JSON.parse(savedSettings) });
       }
     } catch (error) {
       console.error("Failed to load settings from localStorage", error);
@@ -56,12 +62,12 @@ export default function SettingsPage() {
     setSettings((prev) => ({ ...prev, [id]: Number(value) }));
   };
 
-  const handleSwitchChange = (checked: boolean) => {
-    setSettings((prev) => ({ ...prev, randomize: checked }));
+  const handleSwitchChange = (id: keyof Settings, checked: boolean) => {
+    setSettings((prev) => ({ ...prev, [id]: checked }));
   };
 
-  const handleSliderChange = (value: number[]) => {
-    setSettings((prev) => ({ ...prev, scrollSpeed: value[0] }));
+  const handleSliderChange = (id: keyof Settings, value: number[]) => {
+    setSettings((prev) => ({ ...prev, [id]: value[0] }));
   };
 
   const handleSaveChanges = () => {
@@ -138,11 +144,33 @@ export default function SettingsPage() {
                         Show photos and messages in a random order.
                     </span>
                 </Label>
-                <Switch id="randomize" checked={settings.randomize} onCheckedChange={handleSwitchChange}/>
+                <Switch id="randomize" checked={settings.randomize} onCheckedChange={(checked) => handleSwitchChange('randomize', checked)}/>
+            </div>
+             <div className="flex items-center justify-between">
+                <Label htmlFor="randomizeAllPhotos" className="flex flex-col space-y-1">
+                    <span>Randomize Across All Photos</span>
+                    <span className="font-normal leading-snug text-muted-foreground">
+                        If enabled, ignores groups and shuffles all photos together.
+                    </span>
+                </Label>
+                <Switch id="randomizeAllPhotos" checked={settings.randomizeAllPhotos} onCheckedChange={(checked) => handleSwitchChange('randomizeAllPhotos', checked)} />
+            </div>
+             <div className="flex items-center justify-between">
+                <Label htmlFor="randomizeInPhotoGroups" className="flex flex-col space-y-1">
+                    <span>Randomize Within Photo Groups</span>
+                    <span className="font-normal leading-snug text-muted-foreground">
+                        Shuffles the order of photos inside each group.
+                    </span>
+                </Label>
+                <Switch id="randomizeInPhotoGroups" checked={settings.randomizeInPhotoGroups} onCheckedChange={(checked) => handleSwitchChange('randomizeInPhotoGroups', checked)} />
             </div>
             <div className="space-y-3">
                 <Label htmlFor="scrollSpeed">Message Scroll Speed</Label>
-                <Slider id="scrollSpeed" value={[settings.scrollSpeed]} onValueChange={handleSliderChange} max={100} step={1} />
+                <Slider id="scrollSpeed" value={[settings.scrollSpeed]} onValueChange={(value) => handleSliderChange('scrollSpeed', value)} max={100} step={1} />
+            </div>
+            <div className="space-y-3">
+                <Label htmlFor="messageFontSize">Message Font Size ({settings.messageFontSize}px)</Label>
+                <Slider id="messageFontSize" value={[settings.messageFontSize]} onValueChange={(value) => handleSliderChange('messageFontSize', value)} min={24} max={96} step={1} />
             </div>
         </CardContent>
       </Card>
