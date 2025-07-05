@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -41,12 +41,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type Message = {
   id: number;
   content: string;
   schedule: string;
-  status: string;
+  status: 'Active' | 'Scheduled' | 'Expired';
 };
 
 const initialMessages: Message[] = [
@@ -71,13 +72,38 @@ const initialMessages: Message[] = [
 ];
 
 export default function MessagesPage() {
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
 
   const [newContent, setNewContent] = useState('');
   const [newSchedule, setNewSchedule] = useState('');
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedMessages = localStorage.getItem('messages');
+      if (savedMessages) {
+        setMessages(JSON.parse(savedMessages));
+      } else {
+        setMessages(initialMessages);
+      }
+    } catch (error) {
+      console.error("Failed to load messages from localStorage", error);
+      setMessages(initialMessages);
+    }
+    setIsLoading(false);
+  }, []);
+
+  // Save to localStorage when messages change
+  useEffect(() => {
+    if (!isLoading) {
+      localStorage.setItem('messages', JSON.stringify(messages));
+    }
+  }, [messages, isLoading]);
+
 
   const handleAddMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,6 +153,30 @@ export default function MessagesPage() {
       setEditingMessage(null);
     }
   };
+
+  if (isLoading) {
+      return (
+      <div className="flex-1 space-y-4">
+        <div className="flex items-center justify-between space-y-2">
+          <Skeleton className="h-9 w-64" />
+          <Skeleton className="h-10 w-44" />
+        </div>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-7 w-48" />
+            <Skeleton className="h-4 w-96" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      )
+  }
 
   return (
     <div className="flex-1 space-y-4">
