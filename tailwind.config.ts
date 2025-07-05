@@ -82,10 +82,6 @@ export default {
           "from": { opacity: "0" },
           "to": { opacity: "1" },
         },
-        "fade-out": {
-          "from": { opacity: "1" },
-          "to": { opacity: "0" },
-        },
         "scroll-up": {
           "from": { transform: "translateY(100%)" },
           "to": { transform: "translateY(-100%)" },
@@ -94,8 +90,7 @@ export default {
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
-        "fade-in": "fade-in 1.5s ease-in-out",
-        "fade-out": "fade-out 1.5s ease-in-out",
+        "fade-in": "fade-in 1s ease-in-out",
         "scroll-up": "scroll-up 30s linear infinite",
       },
     },

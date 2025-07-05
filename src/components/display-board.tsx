@@ -154,61 +154,53 @@ export function DisplayBoard() {
         }
       });
       // Remove the last blank item as it's redundant
-      if (settings.blankDuration > 0) {
+      if (settings.blankDuration > 0 && finalQueue.length > 0 && finalQueue[finalQueue.length - 1].type === 'blank') {
           finalQueue.pop();
       }
     }
     
     setDisplayQueue(finalQueue);
-    if (finalQueue.length > 0) {
-      setCurrentItem(finalQueue[0]);
-    }
     setIsLoading(false);
   }, []);
 
-  // Cycle through the queue
+  // Main display loop effect
   useEffect(() => {
-    if (isLoading || displayQueue.length === 0) return;
-
-    // The currentItem is now set in the initial useEffect.
-    // This effect is now only for advancing to the next item.
-    const item = currentItem || displayQueue[0];
-    if (!item) return;
-    
-    // If currentItem isn't set yet, set it. This handles the very first load.
-    if (!currentItem) {
-      setCurrentItem(item);
+    if (isLoading || displayQueue.length === 0) {
+      return; // Do nothing if still loading or the queue is empty
     }
 
-    const nextItemTimeout = setTimeout(() => {
+    const item = displayQueue[currentIndex];
+    setCurrentItem(item);
+
+    // Ensure duration is a positive number to prevent freezing
+    const duration = item.duration > 0 ? item.duration : 5000; // Default to 5s if duration is 0 or less
+
+    const timer = setTimeout(() => {
       setCurrentIndex((prevIndex) => (prevIndex + 1) % displayQueue.length);
-    }, item.duration);
+    }, duration);
 
+    // Cleanup function to clear the timer
     return () => {
-      clearTimeout(nextItemTimeout);
+      clearTimeout(timer);
     };
-  }, [currentIndex, displayQueue, isLoading, currentItem]);
-
-  // Update current item when index changes
-  useEffect(() => {
-    if (!isLoading && displayQueue.length > 0) {
-      setCurrentItem(displayQueue[currentIndex]);
-    }
-  }, [currentIndex, isLoading, displayQueue]);
+  }, [currentIndex, displayQueue, isLoading]);
 
 
   const renderItem = () => {
-    if(isLoading || !currentItem) {
+    if(isLoading) {
         return <div className="flex h-full w-full items-center justify-center"><p className="text-2xl text-muted-foreground">Initializing MemBoard...</p></div>;
     }
-    if (displayQueue.length === 0 && !isLoading) {
+    if (displayQueue.length === 0) {
         return <div className="flex h-full w-full items-center justify-center text-center p-8"><p className="text-2xl text-muted-foreground">No content to display. Add photos or "Active" messages in the admin panel.</p></div>;
+    }
+    if (!currentItem) {
+        return null; // Don't render anything if there's no current item (briefly, between states)
     }
 
     switch (currentItem.type) {
       case 'photo':
         return (
-          <div className="relative h-full w-full">
+          <div className="relative h-full w-full animate-fade-in">
             <Image
               key={currentItem.src}
               src={currentItem.src!}
@@ -222,7 +214,7 @@ export function DisplayBoard() {
         );
       case 'message':
         return (
-          <div className="flex h-full w-full items-center justify-center p-12 bg-background">
+          <div className="flex h-full w-full items-center justify-center p-12 bg-background animate-fade-in">
             <div className="relative h-full w-full overflow-hidden">
                <div 
                 key={currentItem.text}
