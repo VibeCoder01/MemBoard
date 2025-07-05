@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { PlusCircle, MoreVertical } from 'lucide-react';
+import { PlusCircle, MoreVertical, Settings } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import {
   Select,
   SelectContent,
@@ -48,6 +49,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { useToast } from '@/hooks/use-toast';
 
 const initialPhotoGroups = {
   family: [
@@ -102,23 +104,33 @@ type Photo = {
 };
 
 type PhotoGroups = {
-  family: Photo[];
-  events: Photo[];
-  scenery: Photo[];
   [key: string]: Photo[];
 };
 
 export default function PhotosPage() {
+  const { toast } = useToast();
   const [photoGroups, setPhotoGroups] =
     useState<PhotoGroups>(initialPhotoGroups);
+  const [activeTab, setActiveTab] = useState(
+    Object.keys(initialPhotoGroups)[0]
+  );
+
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingPhoto, setEditingPhoto] = useState<Photo | null>(null);
 
   const [newPhotoFile, setNewPhotoFile] = useState<File | null>(null);
   const [newPhotoAlt, setNewPhotoAlt] = useState('');
-  const [newPhotoCategory, setNewPhotoCategory] = useState('family');
-  const [editingPhotoCategory, setEditingPhotoCategory] = useState('family');
+  const [newPhotoCategory, setNewPhotoCategory] = useState(activeTab);
+  const [editingPhotoCategory, setEditingPhotoCategory] = useState(activeTab);
+
+  // State for category management
+  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
+  const [newCategoryInput, setNewCategoryInput] = useState('');
+  const [renamingCategory, setRenamingCategory] = useState<{
+    oldName: string;
+    newName: string;
+  } | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -157,7 +169,7 @@ export default function PhotosPage() {
       if (fileInput) fileInput.value = '';
 
       setNewPhotoAlt('');
-      setNewPhotoCategory('family');
+      setNewPhotoCategory(activeTab);
       setIsUploadDialogOpen(false);
     };
     reader.readAsDataURL(newPhotoFile);
@@ -217,78 +229,311 @@ export default function PhotosPage() {
     }
   };
 
+  const handleAddCategory = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedName = newCategoryInput.trim();
+    if (trimmedName && !photoGroups.hasOwnProperty(trimmedName)) {
+      setPhotoGroups((prev) => ({
+        ...prev,
+        [trimmedName]: [],
+      }));
+      setActiveTab(trimmedName);
+      setNewCategoryInput('');
+    } else {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Category name cannot be empty or already exist.',
+      });
+    }
+  };
+
+  const handleDeleteCategory = (categoryName: string) => {
+    if (Object.keys(photoGroups).length <= 1) {
+      toast({
+        variant: 'destructive',
+        title: 'Cannot Delete',
+        description: 'You must have at least one category.',
+      });
+      return;
+    }
+
+    // Deselect tab if it's the one being deleted
+    if (activeTab === categoryName) {
+      const remainingCategories = Object.keys(photoGroups).filter(
+        (c) => c !== categoryName
+      );
+      setActiveTab(remainingCategories[0]);
+    }
+
+    setPhotoGroups((prev) => {
+      const newGroups = { ...prev };
+      delete newGroups[categoryName];
+      return newGroups;
+    });
+  };
+
+  const handleStartRename = (name: string) => {
+    setRenamingCategory({ oldName: name, newName: name });
+  };
+
+  const handleRenameCategory = () => {
+    if (!renamingCategory) return;
+    const { oldName, newName } = renamingCategory;
+    const trimmedNewName = newName.trim();
+
+    if (
+      !trimmedNewName ||
+      (trimmedNewName !== oldName && photoGroups.hasOwnProperty(trimmedNewName))
+    ) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Category name cannot be empty or already exist.',
+      });
+      return;
+    }
+
+    if (trimmedNewName === oldName) {
+      setRenamingCategory(null);
+      return;
+    }
+
+    setPhotoGroups((prev) => {
+      const newGroups = { ...prev };
+      // A more robust way to rename a key while preserving order
+      const entries = Object.entries(newGroups);
+      const index = entries.findIndex(([key]) => key === oldName);
+      entries[index][0] = trimmedNewName;
+      return Object.fromEntries(entries);
+    });
+
+    if (activeTab === oldName) {
+      setActiveTab(trimmedNewName);
+    }
+
+    setRenamingCategory(null);
+  };
+
   return (
     <div className="flex-1 space-y-4">
       <div className="flex items-center justify-between space-y-2">
         <h1 className="text-3xl font-bold tracking-tight font-headline">
           Photo Management
         </h1>
-        <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Upload Photo
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <form onSubmit={handleUploadPhoto}>
+        <div className="flex items-center gap-2">
+          <Dialog
+            open={isCategoryDialogOpen}
+            onOpenChange={setIsCategoryDialogOpen}
+          >
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Settings className="mr-2 h-4 w-4" />
+                Manage Categories
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
               <DialogHeader>
-                <DialogTitle>Upload New Photo</DialogTitle>
+                <DialogTitle>Manage Photo Categories</DialogTitle>
                 <DialogDescription>
-                  Select a photo from your device and add details.
+                  Add, rename, or delete your photo categories here.
                 </DialogDescription>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="photo-file">Photo File</Label>
+              <form onSubmit={handleAddCategory} className="py-4">
+                <Label
+                  htmlFor="new-category-name"
+                  className="text-sm font-medium"
+                >
+                  Add New Category
+                </Label>
+                <div className="flex space-x-2 mt-2">
                   <Input
-                    id="photo-file"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    required
+                    id="new-category-name"
+                    value={newCategoryInput}
+                    onChange={(e) => setNewCategoryInput(e.target.value)}
+                    placeholder="e.g., Holidays"
                   />
+                  <Button type="submit">Add</Button>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="alt-text">Description (Alt Text)</Label>
-                  <Input
-                    id="alt-text"
-                    value={newPhotoAlt}
-                    onChange={(e) => setNewPhotoAlt(e.target.value)}
-                    placeholder="e.g., Family at the beach"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="category">Category</Label>
-                  <Select
-                    value={newPhotoCategory}
-                    onValueChange={setNewPhotoCategory}
-                  >
-                    <SelectTrigger id="category">
-                      <SelectValue placeholder="Select a category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="family">Family</SelectItem>
-                      <SelectItem value="events">Events</SelectItem>
-                      <SelectItem value="scenery">Scenery</SelectItem>
-                    </SelectContent>
-                  </Select>
+              </form>
+              <Separator />
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium">Existing Categories</h4>
+                <div className="max-h-60 space-y-2 overflow-y-auto pr-2">
+                  {Object.keys(photoGroups).map((category) => (
+                    <div
+                      key={category}
+                      className="flex items-center justify-between rounded-md border p-2"
+                    >
+                      {renamingCategory?.oldName === category ? (
+                        <div className="flex w-full items-center gap-2">
+                          <Input
+                            value={renamingCategory.newName}
+                            onChange={(e) =>
+                              setRenamingCategory({
+                                ...renamingCategory,
+                                newName: e.target.value,
+                              })
+                            }
+                            className="h-8"
+                            autoFocus
+                          />
+                          <Button size="sm" onClick={handleRenameCategory}>
+                            Save
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setRenamingCategory(null)}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="text-sm">{category}</span>
+                          <div className="flex items-center">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleStartRename(category)}
+                            >
+                              Rename
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive hover:text-destructive"
+                                  disabled={
+                                    Object.keys(photoGroups).length <= 1
+                                  }
+                                >
+                                  Delete
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>
+                                    Are you absolutely sure?
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This action will permanently delete the "
+                                    {category}" category and all photos within
+                                    it.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className={buttonVariants({
+                                      variant: 'destructive',
+                                    })}
+                                    onClick={() =>
+                                      handleDeleteCategory(category)
+                                    }
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
               <DialogFooter>
                 <Button
-                  type="button"
                   variant="outline"
-                  onClick={() => setIsUploadDialogOpen(false)}
+                  onClick={() => setIsCategoryDialogOpen(false)}
                 >
-                  Cancel
+                  Close
                 </Button>
-                <Button type="submit">Save Photo</Button>
               </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog
+            open={isUploadDialogOpen}
+            onOpenChange={(isOpen) => {
+              setIsUploadDialogOpen(isOpen);
+              if (isOpen) {
+                setNewPhotoCategory(activeTab);
+              }
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Upload Photo
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <form onSubmit={handleUploadPhoto}>
+                <DialogHeader>
+                  <DialogTitle>Upload New Photo</DialogTitle>
+                  <DialogDescription>
+                    Select a photo from your device and add details.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="photo-file">Photo File</Label>
+                    <Input
+                      id="photo-file"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="alt-text">Description (Alt Text)</Label>
+                    <Input
+                      id="alt-text"
+                      value={newPhotoAlt}
+                      onChange={(e) => setNewPhotoAlt(e.target.value)}
+                      placeholder="e.g., Family at the beach"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="category">Category</Label>
+                    <Select
+                      value={newPhotoCategory}
+                      onValueChange={setNewPhotoCategory}
+                    >
+                      <SelectTrigger id="category">
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.keys(photoGroups).map((cat) => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsUploadDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit">Save Photo</Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <Dialog open={isEditDialogOpen} onOpenChange={handleEditDialogChange}>
@@ -333,9 +578,11 @@ export default function PhotosPage() {
                       <SelectValue placeholder="Select a category" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="family">Family</SelectItem>
-                      <SelectItem value="events">Events</SelectItem>
-                      <SelectItem value="scenery">Scenery</SelectItem>
+                      {Object.keys(photoGroups).map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -363,48 +610,41 @@ export default function PhotosPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="family" className="w-full">
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="w-full"
+          >
             <TabsList>
-              <TabsTrigger value="family">Family</TabsTrigger>
-              <TabsTrigger value="events">Events</TabsTrigger>
-              <TabsTrigger value="scenery">Scenery</TabsTrigger>
+              {Object.keys(photoGroups).map((category) => (
+                <TabsTrigger key={category} value={category}>
+                  {category.charAt(0).toUpperCase() + category.slice(1)}
+                </TabsTrigger>
+              ))}
             </TabsList>
-            <TabsContent value="family">
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {photoGroups.family.map((p) => (
-                  <PhotoCard
-                    key={p.id}
-                    photo={p}
-                    onDelete={handleDeletePhoto}
-                    onEdit={handleEditClick}
-                  />
-                ))}
-              </div>
-            </TabsContent>
-            <TabsContent value="events">
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {photoGroups.events.map((p) => (
-                  <PhotoCard
-                    key={p.id}
-                    photo={p}
-                    onDelete={handleDeletePhoto}
-                    onEdit={handleEditClick}
-                  />
-                ))}
-              </div>
-            </TabsContent>
-            <TabsContent value="scenery">
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {photoGroups.scenery.map((p) => (
-                  <PhotoCard
-                    key={p.id}
-                    photo={p}
-                    onDelete={handleDeletePhoto}
-                    onEdit={handleEditClick}
-                  />
-                ))}
-              </div>
-            </TabsContent>
+            {Object.entries(photoGroups).map(([category, photos]) => (
+              <TabsContent key={category} value={category} className="mt-4">
+                {photos.length > 0 ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {photos.map((p) => (
+                      <PhotoCard
+                        key={p.id}
+                        photo={p}
+                        onDelete={handleDeletePhoto}
+                        onEdit={handleEditClick}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-12 text-center text-muted-foreground">
+                    <p>This category is empty.</p>
+                    <p className="text-sm">
+                      Upload a photo to add it to this category.
+                    </p>
+                  </div>
+                )}
+              </TabsContent>
+            ))}
           </Tabs>
         </CardContent>
       </Card>
