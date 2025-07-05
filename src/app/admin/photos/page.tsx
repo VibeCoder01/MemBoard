@@ -1,4 +1,7 @@
+'use client';
+
 import Image from 'next/image';
+import { useState } from 'react';
 import {
   Card,
   CardContent,
@@ -8,34 +11,209 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, MoreVertical } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
-const photoGroups = {
+const initialPhotoGroups = {
   family: [
-    { id: 1, src: 'https://placehold.co/400x300', alt: 'Family at the beach', 'data-ai-hint': 'family beach' },
-    { id: 2, src: 'https://placehold.co/400x300', alt: 'Grandparents smiling', 'data-ai-hint': 'old couple' },
+    {
+      id: 1,
+      src: 'https://placehold.co/400x300',
+      alt: 'Family at the beach',
+      'data-ai-hint': 'family beach',
+    },
+    {
+      id: 2,
+      src: 'https://placehold.co/400x300',
+      alt: 'Grandparents smiling',
+      'data-ai-hint': 'old couple',
+    },
   ],
   events: [
-    { id: 3, src: 'https://placehold.co/400x300', alt: 'Birthday party', 'data-ai-hint': 'birthday party' },
+    {
+      id: 3,
+      src: 'https://placehold.co/400x300',
+      alt: 'Birthday party',
+      'data-ai-hint': 'birthday party',
+    },
   ],
   scenery: [
-     { id: 4, src: 'https://placehold.co/400x300', alt: 'Mountain landscape', 'data-ai-hint': 'mountain landscape' },
-     { id: 5, src: 'https://placehold.co/400x300', alt: 'City skyline at night', 'data-ai-hint': 'city night' },
-     { id: 6, src: 'https://placehold.co/400x300', alt: 'Forest path', 'data-ai-hint': 'forest path' },
-  ]
-}
+    {
+      id: 4,
+      src: 'https://placehold.co/400x300',
+      alt: 'Mountain landscape',
+      'data-ai-hint': 'mountain landscape',
+    },
+    {
+      id: 5,
+      src: 'https://placehold.co/400x300',
+      alt: 'City skyline at night',
+      'data-ai-hint': 'city night',
+    },
+    {
+      id: 6,
+      src: 'https://placehold.co/400x300',
+      alt: 'Forest path',
+      'data-ai-hint': 'forest path',
+    },
+  ],
+};
+
+type Photo = {
+  id: number;
+  src: string;
+  alt: string;
+  'data-ai-hint': string;
+};
+
+type PhotoGroups = {
+  family: Photo[];
+  events: Photo[];
+  scenery: Photo[];
+  [key: string]: Photo[];
+};
 
 export default function PhotosPage() {
+  const [photoGroups, setPhotoGroups] =
+    useState<PhotoGroups>(initialPhotoGroups);
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+
+  const [newPhotoFile, setNewPhotoFile] = useState<File | null>(null);
+  const [newPhotoAlt, setNewPhotoAlt] = useState('');
+  const [newPhotoCategory, setNewPhotoCategory] = useState('family');
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setNewPhotoFile(e.target.files[0]);
+    }
+  };
+
+  const handleUploadPhoto = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPhotoFile || !newPhotoAlt.trim()) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const src = event.target?.result as string;
+      const newPhoto = {
+        id: Date.now(),
+        src,
+        alt: newPhotoAlt,
+        'data-ai-hint': newPhotoAlt
+          .toLowerCase()
+          .split(' ')
+          .slice(0, 2)
+          .join(' '),
+      };
+
+      setPhotoGroups((prev) => ({
+        ...prev,
+        [newPhotoCategory]: [...(prev[newPhotoCategory] || []), newPhoto],
+      }));
+
+      // Reset form and close dialog
+      setNewPhotoFile(null);
+      const fileInput = document.getElementById(
+        'photo-file'
+      ) as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
+
+      setNewPhotoAlt('');
+      setNewPhotoCategory('family');
+      setIsUploadDialogOpen(false);
+    };
+    reader.readAsDataURL(newPhotoFile);
+  };
+
   return (
     <div className="flex-1 space-y-4">
       <div className="flex items-center justify-between space-y-2">
         <h1 className="text-3xl font-bold tracking-tight font-headline">
           Photo Management
         </h1>
-        <Button>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Upload Photo
-        </Button>
+        <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Upload Photo
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md">
+            <form onSubmit={handleUploadPhoto}>
+              <DialogHeader>
+                <DialogTitle>Upload New Photo</DialogTitle>
+                <DialogDescription>
+                  Select a photo from your device and add details.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="photo-file">Photo File</Label>
+                  <Input
+                    id="photo-file"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="alt-text">Description (Alt Text)</Label>
+                  <Input
+                    id="alt-text"
+                    value={newPhotoAlt}
+                    onChange={(e) => setNewPhotoAlt(e.target.value)}
+                    placeholder="e.g., Family at the beach"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="category">Category</Label>
+                  <Select
+                    value={newPhotoCategory}
+                    onValueChange={setNewPhotoCategory}
+                  >
+                    <SelectTrigger id="category">
+                      <SelectValue placeholder="Select a category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="family">Family</SelectItem>
+                      <SelectItem value="events">Events</SelectItem>
+                      <SelectItem value="scenery">Scenery</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsUploadDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit">Save Photo</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
       <Card>
         <CardHeader>
@@ -45,7 +223,7 @@ export default function PhotosPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-           <Tabs defaultValue="family" className="w-full">
+          <Tabs defaultValue="family" className="w-full">
             <TabsList>
               <TabsTrigger value="family">Family</TabsTrigger>
               <TabsTrigger value="events">Events</TabsTrigger>
@@ -53,17 +231,23 @@ export default function PhotosPage() {
             </TabsList>
             <TabsContent value="family">
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {photoGroups.family.map(p => <PhotoCard key={p.id} {...p} />)}
+                {photoGroups.family.map((p) => (
+                  <PhotoCard key={p.id} {...p} />
+                ))}
               </div>
             </TabsContent>
             <TabsContent value="events">
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {photoGroups.events.map(p => <PhotoCard key={p.id} {...p} />)}
+                {photoGroups.events.map((p) => (
+                  <PhotoCard key={p.id} {...p} />
+                ))}
               </div>
             </TabsContent>
             <TabsContent value="scenery">
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {photoGroups.scenery.map(p => <PhotoCard key={p.id} {...p} />)}
+                {photoGroups.scenery.map((p) => (
+                  <PhotoCard key={p.id} {...p} />
+                ))}
               </div>
             </TabsContent>
           </Tabs>
@@ -73,11 +257,25 @@ export default function PhotosPage() {
   );
 }
 
-function PhotoCard({ src, alt, 'data-ai-hint': dataAiHint }: { src: string, alt: string, 'data-ai-hint': string }) {
+function PhotoCard({
+  src,
+  alt,
+  'data-ai-hint': dataAiHint,
+}: {
+  src: string;
+  alt: string;
+  'data-ai-hint': string;
+}) {
   return (
     <Card className="overflow-hidden">
       <div className="relative aspect-[4/3]">
-        <Image src={src} alt={alt} layout="fill" objectFit="cover" data-ai-hint={dataAiHint} />
+        <Image
+          src={src}
+          alt={alt}
+          layout="fill"
+          objectFit="cover"
+          data-ai-hint={dataAiHint}
+        />
       </div>
       <CardContent className="p-2 flex items-center justify-between">
         <p className="text-xs text-muted-foreground truncate">{alt}</p>
@@ -86,5 +284,5 @@ function PhotoCard({ src, alt, 'data-ai-hint': dataAiHint }: { src: string, alt:
         </Button>
       </CardContent>
     </Card>
-  )
+  );
 }
