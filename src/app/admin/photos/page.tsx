@@ -9,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { PlusCircle, MoreVertical } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -30,6 +30,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 const initialPhotoGroups = {
   family: [
@@ -94,10 +112,13 @@ export default function PhotosPage() {
   const [photoGroups, setPhotoGroups] =
     useState<PhotoGroups>(initialPhotoGroups);
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingPhoto, setEditingPhoto] = useState<Photo | null>(null);
 
   const [newPhotoFile, setNewPhotoFile] = useState<File | null>(null);
   const [newPhotoAlt, setNewPhotoAlt] = useState('');
   const [newPhotoCategory, setNewPhotoCategory] = useState('family');
+  const [editingPhotoCategory, setEditingPhotoCategory] = useState('family');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -140,6 +161,60 @@ export default function PhotosPage() {
       setIsUploadDialogOpen(false);
     };
     reader.readAsDataURL(newPhotoFile);
+  };
+
+  const handleDeletePhoto = (id: number) => {
+    setPhotoGroups((prev) => {
+      const newGroups = { ...prev };
+      for (const category in newGroups) {
+        newGroups[category] = newGroups[category].filter((p) => p.id !== id);
+      }
+      return newGroups;
+    });
+  };
+
+  const handleEditClick = (photo: Photo) => {
+    setEditingPhoto({ ...photo });
+    for (const category in photoGroups) {
+      if (photoGroups[category].some((p) => p.id === photo.id)) {
+        setEditingPhotoCategory(category);
+        break;
+      }
+    }
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdatePhoto = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPhoto) return;
+
+    setPhotoGroups((prev) => {
+      const newGroups = JSON.parse(JSON.stringify(prev)); // Deep copy to avoid mutation issues
+
+      // Remove photo from all categories first
+      for (const category in newGroups) {
+        newGroups[category] = newGroups[category].filter(
+          (p: Photo) => p.id !== editingPhoto.id
+        );
+      }
+
+      // Add updated photo to the new category
+      if (!newGroups[editingPhotoCategory]) {
+        newGroups[editingPhotoCategory] = [];
+      }
+      newGroups[editingPhotoCategory].push(editingPhoto);
+      return newGroups;
+    });
+
+    setIsEditDialogOpen(false);
+    setEditingPhoto(null);
+  };
+
+  const handleEditDialogChange = (open: boolean) => {
+    setIsEditDialogOpen(open);
+    if (!open) {
+      setEditingPhoto(null);
+    }
   };
 
   return (
@@ -215,6 +290,71 @@ export default function PhotosPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={handleEditDialogChange}>
+        <DialogContent className="sm:max-w-md">
+          <form onSubmit={handleUpdatePhoto}>
+            <DialogHeader>
+              <DialogTitle>Edit Photo</DialogTitle>
+              <DialogDescription>Update the photo details.</DialogDescription>
+            </DialogHeader>
+            {editingPhoto && (
+              <div className="grid gap-4 py-4">
+                <div className="relative aspect-video w-full">
+                  <Image
+                    src={editingPhoto.src}
+                    alt={editingPhoto.alt}
+                    layout="fill"
+                    objectFit="contain"
+                    className="rounded-md"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-alt-text">Description (Alt Text)</Label>
+                  <Input
+                    id="edit-alt-text"
+                    value={editingPhoto.alt}
+                    onChange={(e) =>
+                      setEditingPhoto({
+                        ...editingPhoto,
+                        alt: e.target.value,
+                      })
+                    }
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-category">Category</Label>
+                  <Select
+                    value={editingPhotoCategory}
+                    onValueChange={setEditingPhotoCategory}
+                  >
+                    <SelectTrigger id="edit-category">
+                      <SelectValue placeholder="Select a category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="family">Family</SelectItem>
+                      <SelectItem value="events">Events</SelectItem>
+                      <SelectItem value="scenery">Scenery</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleEditDialogChange(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit">Save Changes</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       <Card>
         <CardHeader>
           <CardTitle>Photo Library</CardTitle>
@@ -232,21 +372,36 @@ export default function PhotosPage() {
             <TabsContent value="family">
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {photoGroups.family.map((p) => (
-                  <PhotoCard key={p.id} {...p} />
+                  <PhotoCard
+                    key={p.id}
+                    photo={p}
+                    onDelete={handleDeletePhoto}
+                    onEdit={handleEditClick}
+                  />
                 ))}
               </div>
             </TabsContent>
             <TabsContent value="events">
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {photoGroups.events.map((p) => (
-                  <PhotoCard key={p.id} {...p} />
+                  <PhotoCard
+                    key={p.id}
+                    photo={p}
+                    onDelete={handleDeletePhoto}
+                    onEdit={handleEditClick}
+                  />
                 ))}
               </div>
             </TabsContent>
             <TabsContent value="scenery">
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {photoGroups.scenery.map((p) => (
-                  <PhotoCard key={p.id} {...p} />
+                  <PhotoCard
+                    key={p.id}
+                    photo={p}
+                    onDelete={handleDeletePhoto}
+                    onEdit={handleEditClick}
+                  />
                 ))}
               </div>
             </TabsContent>
@@ -258,14 +413,16 @@ export default function PhotosPage() {
 }
 
 function PhotoCard({
-  src,
-  alt,
-  'data-ai-hint': dataAiHint,
+  photo,
+  onDelete,
+  onEdit,
 }: {
-  src: string;
-  alt: string;
-  'data-ai-hint': string;
+  photo: Photo;
+  onDelete: (id: number) => void;
+  onEdit: (photo: Photo) => void;
 }) {
+  const { id, src, alt, 'data-ai-hint': dataAiHint } = photo;
+
   return (
     <Card className="overflow-hidden">
       <div className="relative aspect-[4/3]">
@@ -279,9 +436,47 @@ function PhotoCard({
       </div>
       <CardContent className="p-2 flex items-center justify-between">
         <p className="text-xs text-muted-foreground truncate">{alt}</p>
-        <Button variant="ghost" size="icon" className="h-6 w-6">
-          <MoreVertical className="h-4 w-4" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-6 w-6">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onEdit(photo)}>
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <DropdownMenuItem
+                  onSelect={(e) => e.preventDefault()}
+                  className="text-destructive focus:text-destructive"
+                >
+                  Delete
+                </DropdownMenuItem>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete
+                    this photo.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => onDelete(id)}
+                    className={buttonVariants({ variant: 'destructive' })}
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </CardContent>
     </Card>
   );
