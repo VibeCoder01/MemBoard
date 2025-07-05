@@ -73,7 +73,6 @@ const shuffle = <T,>(array: T[]): T[] => {
 export function DisplayBoard() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentItem, setCurrentItem] = useState<DisplayItem | null>(null);
-  const [isFading, setIsFading] = useState(false);
   const [displayQueue, setDisplayQueue] = useState<DisplayItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -171,19 +170,13 @@ export function DisplayBoard() {
     const item = displayQueue[currentIndex];
     if (!item) return;
 
-    setIsFading(true);
-
-    const fadeTimeout = setTimeout(() => {
-      setCurrentItem(item);
-      setIsFading(false);
-    }, 500);
+    setCurrentItem(item);
 
     const nextItemTimeout = setTimeout(() => {
       setCurrentIndex((prevIndex) => (prevIndex + 1) % displayQueue.length);
-    }, item.duration + 500); // Add fade time to duration
+    }, item.duration);
 
     return () => {
-      clearTimeout(fadeTimeout);
       clearTimeout(nextItemTimeout);
     };
   }, [currentIndex, displayQueue, isLoading]);
@@ -207,7 +200,6 @@ export function DisplayBoard() {
               alt={currentItem.alt!}
               fill={true}
               style={{ objectFit: 'cover' }}
-              className="transition-opacity duration-1000"
               data-ai-hint={currentItem['data-ai-hint']}
               priority={true}
             />
@@ -237,9 +229,7 @@ export function DisplayBoard() {
 
   return (
     <Card className="h-full w-full rounded-none border-none bg-background shadow-none">
-      <CardContent
-        className={`h-full w-full p-0 transition-opacity duration-500 ease-in-out ${isFading ? 'opacity-0' : 'opacity-100'}`}
-      >
+      <CardContent className="h-full w-full p-0">
         {renderItem()}
       </CardContent>
     </Card>
