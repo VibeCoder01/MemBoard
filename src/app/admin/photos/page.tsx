@@ -61,17 +61,38 @@ export default function PhotosPage() {
   const [photoGroups, setPhotoGroups] = useState<PhotoGroups>({});
   const [activeTab, setActiveTab] = useState('');
 
-  // Load from localStorage on component mount
+  // Load from localStorage on component mount and clean up duplicates
   useEffect(() => {
     try {
-      const savedGroups = localStorage.getItem('photoGroups');
-      if (savedGroups && savedGroups !== '{}') {
-        setPhotoGroups(JSON.parse(savedGroups));
+      const savedGroupsJSON = localStorage.getItem('photoGroups');
+      let loadedGroups: PhotoGroups;
+
+      if (savedGroupsJSON && savedGroupsJSON !== '{}') {
+        loadedGroups = JSON.parse(savedGroupsJSON);
       } else {
-        setPhotoGroups(initialPhotoGroups);
+        loadedGroups = initialPhotoGroups;
       }
+      
+      // De-duplicate photos to fix legacy data issues.
+      const seenIds = new Set<number>();
+      const cleanedGroups: PhotoGroups = {};
+      for (const category in loadedGroups) {
+          if (Array.isArray(loadedGroups[category])) {
+            cleanedGroups[category] = [];
+            for (const photo of loadedGroups[category]) {
+                if (photo && photo.id && !seenIds.has(photo.id)) {
+                    cleanedGroups[category].push(photo);
+                    seenIds.add(photo.id);
+                }
+                // If ID is seen or photo is malformed, we just skip it.
+            }
+          }
+      }
+
+      setPhotoGroups(cleanedGroups);
+
     } catch (error) {
-      console.error('Failed to load photo groups from localStorage', error);
+      console.error('Failed to load or clean photo groups from localStorage', error);
       setPhotoGroups(initialPhotoGroups);
     }
     setIsLoading(false);
@@ -162,9 +183,8 @@ export default function PhotosPage() {
     }
 
     const filesArray = Array.from(newPhotoFiles);
-    const baseId = Date.now();
-
-    const readFileAsDataURL = (file: File, index: number): Promise<Photo> => {
+    
+    const readFileAsDataURL = (file: File): Promise<Photo> => {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = (event) => {
@@ -173,7 +193,7 @@ export default function PhotosPage() {
             .substring(0, file.name.lastIndexOf('.'))
             .replace(/[-_]/g, ' ');
           resolve({
-            id: baseId + index,
+            id: Date.now() + Math.random(), // Robust unique ID
             src,
             alt: altText,
             'data-ai-hint': altText
@@ -190,7 +210,7 @@ export default function PhotosPage() {
 
     try {
       const newPhotos = await Promise.all(
-        filesArray.map((file, index) => readFileAsDataURL(file, index))
+        filesArray.map(file => readFileAsDataURL(file))
       );
 
       setPhotoGroups((prev) => {
@@ -363,7 +383,11 @@ export default function PhotosPage() {
               [trimmedNewName, photos],
               ...entries.slice(index + 1),
           ];
-          return Object.fromEntries(newEntries);
+          const reorderedGroups: PhotoGroups = {};
+          for (const [key, value] of newEntries) {
+            reorderedGroups[key] = value;
+          }
+          return reorderedGroups;
       }
       return newGroups;
     });
@@ -397,7 +421,7 @@ export default function PhotosPage() {
               <Skeleton className="h-10 w-24" />
             </div>
             <div className="py-12 text-center text-muted-foreground">
-              <p>Loading photo library...</p>
+              <p>Loading and cleaning photo library...</p>
             </div>
           </CardContent>
         </Card>
