@@ -28,7 +28,13 @@ const shuffle = <T,>(array: T[]): T[] => {
   return newArray;
 };
 
-export function DisplayBoard({ onStatusChange }: { onStatusChange: (message: string) => void }) {
+export function DisplayBoard({ 
+  onStatusChange,
+  onBlankScreenChange,
+}: { 
+  onStatusChange: (message: string) => void;
+  onBlankScreenChange: (isBlank: boolean) => void;
+}) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentItem, setCurrentItem] = useState<DisplayItem | null>(null);
   const [displayQueue, setDisplayQueue] = useState<DisplayItem[]>([]);
@@ -60,6 +66,7 @@ export function DisplayBoard({ onStatusChange }: { onStatusChange: (message: str
       
       let contentItems: DisplayItem[] = [];
 
+      // 1. Add photos if enabled
       if (loadedSettings.displayPhotos) {
           let photoList: Photo[] = Object.values(photoGroups).flat().filter(p => p && p.src);
           if (loadedSettings.randomizeAllPhotos) {
@@ -77,7 +84,7 @@ export function DisplayBoard({ onStatusChange }: { onStatusChange: (message: str
               photoList = groupedList;
           }
           const photoItems: DisplayItem[] = photoList
-            .filter(p => p && p.src)
+            .filter(p => p && p.src) // extra safety check
             .map(p => ({
               type: 'photo',
               src: p.src,
@@ -88,12 +95,13 @@ export function DisplayBoard({ onStatusChange }: { onStatusChange: (message: str
           contentItems.push(...photoItems);
       }
       
+      // 2. Add messages if enabled
       if (loadedSettings.displayMessages) {
           const activeMessages = messages.filter(m => m.status === 'Active');
           const getMessageDuration = (text: string) => {
             const baseDuration = (text.split(/\s+/).length * 0.5 + 5) * 1000;
             const scrollFactor = (150 - loadedSettings.scrollSpeed) / 50; 
-            const animationDistanceFactor = 2;
+            const animationDistanceFactor = 2; // This ensures it scrolls off screen
             return baseDuration * scrollFactor * animationDistanceFactor;
           };
           const messageItems: DisplayItem[] = activeMessages.map(m => ({
@@ -105,10 +113,12 @@ export function DisplayBoard({ onStatusChange }: { onStatusChange: (message: str
           contentItems.push(...messageItems);
       }
       
+      // 3. Shuffle globally if enabled
       if (loadedSettings.randomize) {
         contentItems = shuffle(contentItems);
       }
       
+      // 4. Build final queue with blank screens
       const finalQueue: DisplayItem[] = [];
       if (contentItems.length > 0) {
         contentItems.forEach((item, index) => {
@@ -149,6 +159,8 @@ export function DisplayBoard({ onStatusChange }: { onStatusChange: (message: str
     setCurrentItem(item);
     setKey(k => k + 1); // Force re-render for animations
     
+    onBlankScreenChange(item.type === 'blank');
+    
     if (settings.monitorActivity) {
       switch (item.type) {
         case 'photo':
@@ -175,8 +187,11 @@ export function DisplayBoard({ onStatusChange }: { onStatusChange: (message: str
       setCurrentIndex((prevIndex) => (prevIndex + 1) % displayQueue.length);
     }, duration);
 
-    return () => clearTimeout(timer);
-  }, [currentIndex, displayQueue, isLoading, onStatusChange, settings]);
+    return () => {
+      clearTimeout(timer);
+      onBlankScreenChange(false);
+    };
+  }, [currentIndex, displayQueue, isLoading, onStatusChange, settings, onBlankScreenChange]);
 
   const renderItem = () => {
     if (isLoading) {
@@ -222,7 +237,8 @@ export function DisplayBoard({ onStatusChange }: { onStatusChange: (message: str
         );
       case 'blank':
       default:
-        return <div key={key} className="h-full w-full bg-background animate-fade-in" />;
+        // This just needs to be a placeholder, the parent component handles the fade to black.
+        return <div key={key} className="h-full w-full bg-background" />;
     }
   };
 
