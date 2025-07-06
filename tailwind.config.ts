@@ -82,7 +82,7 @@ export default {
           "from": { opacity: "0" },
           "to": { opacity: "1" },
         },
-        "scroll-up": {
+        "scroll-message": {
           "from": { transform: "translateY(100%)" },
           "to": { transform: "translateY(-100%)" },
         },
@@ -91,7 +91,7 @@ export default {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
         "fade-in": "fade-in 1s ease-in-out",
-        "scroll-up": "scroll-up 30s linear infinite",
+        "scroll-message": "scroll-message var(--scroll-duration, 30s) linear",
       },
     },
   },

@@ -19,7 +19,6 @@ export type PhotoGroups = {
 
 export type Settings = {
   photoDuration: number;
-  messageDuration: number;
   blankDuration: number;
   randomize: boolean;
   scrollSpeed: number;
@@ -100,7 +99,6 @@ export const initialPhotoGroups: PhotoGroups = {
 
 export const defaultSettings: Settings = {
   photoDuration: 10,
-  messageDuration: 15,
   blankDuration: 3,
   randomize: false,
   scrollSpeed: 50,

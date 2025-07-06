@@ -31,11 +31,12 @@ const shuffle = <T,>(array: T[]): T[] => {
 
 export function DisplayBoard() {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentItem, setCurrentItem] = useState<DisplayItem | null>(null);
   const [displayQueue, setDisplayQueue] = useState<DisplayItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [key, setKey] = useState(0); // To reset animations
 
-  // Effect to load data and build the queue once on mount
+  // Effect to load data and build the queue once
   useEffect(() => {
     // 1. Load data with fallbacks
     let settings: Settings;
@@ -50,7 +51,9 @@ export function DisplayBoard() {
       messages = savedMessages ? JSON.parse(savedMessages) : initialMessages;
       
       const savedPhotos = localStorage.getItem('photoGroups');
-      photoGroups = (savedPhotos && Object.keys(JSON.parse(savedPhotos)).length > 0) ? JSON.parse(savedPhotos) : initialPhotoGroups;
+      const parsedPhotos = savedPhotos ? JSON.parse(savedPhotos) : initialPhotoGroups;
+      photoGroups = (parsedPhotos && Object.keys(parsedPhotos).length > 0) ? parsedPhotos : initialPhotoGroups;
+
     } catch (error) {
       console.error("Failed to load data from localStorage", error);
       settings = defaultSettings;
@@ -63,7 +66,7 @@ export function DisplayBoard() {
 
     // Add photos ONLY if enabled
     if (settings.displayPhotos) {
-        let photoList: Photo[] = Object.values(photoGroups).flat();
+        let photoList: Photo[] = Object.values(photoGroups).flat().filter(p => p && p.src);
 
         if (settings.randomizeAllPhotos) {
             photoList = shuffle(photoList);
@@ -80,9 +83,8 @@ export function DisplayBoard() {
             photoList = groupedList;
         }
         
-        // Create display items, filtering for valid photos
         const photoItems: DisplayItem[] = photoList
-          .filter(p => p && p.src)
+          .filter(p => p && p.src) // extra safety check
           .map(p => ({
             type: 'photo',
             src: p.src,
@@ -96,14 +98,25 @@ export function DisplayBoard() {
     // Add messages ONLY if enabled
     if (settings.displayMessages) {
         const activeMessages = messages.filter(m => m.status === 'Active');
-        const scrollDuration = 60 - (settings.scrollSpeed / 100) * 50; 
-        const messageItems: DisplayItem[] = activeMessages.map(m => ({
-          type: 'message',
-          text: m.content,
-          duration: (settings.messageDuration || 15) * 1000,
-          fontSize: settings.messageFontSize,
-          scrollDuration: scrollDuration,
-        }));
+        
+        // Calculate message duration based on text length and scroll speed
+        const getMessageDuration = (text: string) => {
+            const wordCount = text.split(/\s+/).length;
+            // Slower speed (higher slider value) means longer duration
+            const speedFactor = 150 - settings.scrollSpeed; // e.g., 50 -> 100, 100 -> 50
+            return (wordCount * 0.5 + 5) * (speedFactor / 50) * 1000;
+        };
+
+        const messageItems: DisplayItem[] = activeMessages.map(m => {
+            const duration = getMessageDuration(m.content);
+            return {
+                type: 'message',
+                text: m.content,
+                duration: duration,
+                fontSize: settings.messageFontSize,
+                scrollDuration: duration / 1000,
+            };
+        });
         contentItems.push(...messageItems);
     }
     
@@ -131,25 +144,23 @@ export function DisplayBoard() {
 
   // Effect to manage the display timer loop
   useEffect(() => {
-    // Don't start the loop until the queue is ready
-    if (isLoading || displayQueue.length === 0) return;
-
-    // Get the current item's duration, with a fallback
-    const currentItem = displayQueue[currentIndex];
-    const duration = currentItem?.duration > 0 ? currentItem.duration : 5000;
+    if (isLoading || displayQueue.length === 0) {
+      setCurrentItem(null);
+      return;
+    }
+    
+    setCurrentItem(displayQueue[currentIndex]);
+    setKey(k => k + 1);
+    
+    const currentItemInEffect = displayQueue[currentIndex];
+    const duration = currentItemInEffect?.duration > 0 ? currentItemInEffect.duration : 5000;
 
     const timer = setTimeout(() => {
-      // Move to the next item
       setCurrentIndex((prevIndex) => (prevIndex + 1) % displayQueue.length);
-      // Reset animation key
-      setKey(k => k + 1);
     }, duration);
 
-    // Cleanup the timer when the component unmounts or dependencies change
     return () => clearTimeout(timer);
   }, [currentIndex, displayQueue, isLoading]);
-
-  const currentItem = displayQueue[currentIndex];
 
   const renderItem = () => {
     if (isLoading) {
@@ -174,12 +185,16 @@ export function DisplayBoard() {
           </div>
         );
       case 'message':
+        const style = {
+          '--scroll-duration': `${currentItem.scrollDuration}s`,
+        } as React.CSSProperties;
+
         return (
           <div key={key} className="flex h-full w-full items-center justify-center p-12 bg-background animate-fade-in">
             <div className="relative h-full w-full overflow-hidden">
-               <div 
-                className="animate-scroll-up absolute bottom-0 flex h-full flex-col justify-center text-center"
-                style={{ animationDuration: `${currentItem.scrollDuration}s` }}
+               <div
+                className="animate-scroll-message absolute flex h-full w-full flex-col justify-center text-center"
+                style={style}
               >
                 <p className="font-body leading-normal text-foreground" style={{fontSize: `${currentItem.fontSize}px`}}>
                   {currentItem.text}

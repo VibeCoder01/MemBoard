@@ -100,10 +100,6 @@ export default function SettingsPage() {
                 <Input id="photoDuration" type="number" value={settings.photoDuration} onChange={handleInputChange} />
             </div>
             <div className="space-y-2">
-                <Label htmlFor="messageDuration">Message Display Duration (seconds)</Label>
-                <Input id="messageDuration" type="number" value={settings.messageDuration} onChange={handleInputChange} />
-            </div>
-            <div className="space-y-2">
                 <Label htmlFor="blankDuration">Blank Screen Pause (seconds)</Label>
                 <Input id="blankDuration" type="number" value={settings.blankDuration} onChange={handleInputChange} />
             </div>
