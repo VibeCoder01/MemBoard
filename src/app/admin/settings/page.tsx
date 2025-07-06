@@ -24,6 +24,9 @@ type Settings = {
   randomizeAllPhotos: boolean;
   randomizeInPhotoGroups: boolean;
   messageFontSize: number;
+  displayPhotos: boolean;
+  displayMessages: boolean;
+  useBlankScreens: boolean;
 };
 
 const defaultSettings: Settings = {
@@ -35,6 +38,9 @@ const defaultSettings: Settings = {
   randomizeAllPhotos: false,
   randomizeInPhotoGroups: true,
   messageFontSize: 48,
+  displayPhotos: true,
+  displayMessages: true,
+  useBlankScreens: true,
 };
 
 export default function SettingsPage() {
@@ -137,6 +143,33 @@ export default function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+             <div className="flex items-center justify-between">
+                <Label htmlFor="displayPhotos" className="flex flex-col space-y-1">
+                    <span>Display Photos</span>
+                    <span className="font-normal leading-snug text-muted-foreground">
+                        Include photos in the display rotation.
+                    </span>
+                </Label>
+                <Switch id="displayPhotos" checked={settings.displayPhotos} onCheckedChange={(checked) => handleSwitchChange('displayPhotos', checked)}/>
+            </div>
+             <div className="flex items-center justify-between">
+                <Label htmlFor="displayMessages" className="flex flex-col space-y-1">
+                    <span>Display Messages</span>
+                    <span className="font-normal leading-snug text-muted-foreground">
+                        Include messages in the display rotation.
+                    </span>
+                </Label>
+                <Switch id="displayMessages" checked={settings.displayMessages} onCheckedChange={(checked) => handleSwitchChange('displayMessages', checked)}/>
+            </div>
+             <div className="flex items-center justify-between">
+                <Label htmlFor="useBlankScreens" className="flex flex-col space-y-1">
+                    <span>Use Blank Screens</span>
+                    <span className="font-normal leading-snug text-muted-foreground">
+                        Show a blank screen between each content item.
+                    </span>
+                </Label>
+                <Switch id="useBlankScreens" checked={settings.useBlankScreens} onCheckedChange={(checked) => handleSwitchChange('useBlankScreens', checked)}/>
+            </div>
             <div className="flex items-center justify-between">
                 <Label htmlFor="randomize" className="flex flex-col space-y-1">
                     <span>Randomize Content Order</span>

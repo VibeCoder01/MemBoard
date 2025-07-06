@@ -32,6 +32,9 @@ type Settings = {
   randomizeAllPhotos: boolean;
   randomizeInPhotoGroups: boolean;
   messageFontSize: number;
+  displayPhotos: boolean;
+  displayMessages: boolean;
+  useBlankScreens: boolean;
 };
 
 const defaultSettings: Settings = {
@@ -43,6 +46,9 @@ const defaultSettings: Settings = {
   randomizeAllPhotos: false,
   randomizeInPhotoGroups: true,
   messageFontSize: 48,
+  displayPhotos: true,
+  displayMessages: true,
+  useBlankScreens: true,
 };
 
 type DisplayItem = {
@@ -102,7 +108,7 @@ export function DisplayBoard() {
     let photos: Photo[] = [];
     if (settings.randomizeAllPhotos) {
       photos = Object.values(photoGroups).flat();
-      if(settings.randomize || settings.randomizeInPhotoGroups) { // If either is true, shuffle the flattened list
+      if(settings.randomize || settings.randomizeInPhotoGroups) {
           photos = shuffle(photos);
       }
     } else {
@@ -115,31 +121,35 @@ export function DisplayBoard() {
         photos.push(...groupPhotos);
       }
     }
-    
-    // Filter for active messages
-    const activeMessages = messages.filter(m => m.status === 'Active');
-    
-    // Map to DisplayItem format
-    const photoItems: DisplayItem[] = photos.map(p => ({
-      type: 'photo',
-      src: p.src,
-      alt: p.alt,
-      'data-ai-hint': p['data-ai-hint'],
-      duration: settings.photoDuration * 1000
-    }));
 
-    // Slower scroll speed = longer duration
-    const scrollDuration = 60 - (settings.scrollSpeed / 100) * 50; 
-    const messageItems: DisplayItem[] = activeMessages.map(m => ({
-      type: 'message',
-      text: m.content,
-      duration: settings.messageDuration * 1000,
-      fontSize: settings.messageFontSize,
-      scrollDuration: scrollDuration,
-    }));
+    let combinedItems: DisplayItem[] = [];
+
+    if (settings.displayPhotos) {
+        const photoItems: DisplayItem[] = photos.map(p => ({
+          type: 'photo',
+          src: p.src,
+          alt: p.alt,
+          'data-ai-hint': p['data-ai-hint'],
+          duration: settings.photoDuration * 1000
+        }));
+        combinedItems.push(...photoItems);
+    }
     
-    // Combine and shuffle if global randomize is on
-    let combinedItems: DisplayItem[] = [...photoItems, ...messageItems];
+    if (settings.displayMessages) {
+        const activeMessages = messages.filter(m => m.status === 'Active');
+        // Slower scroll speed = longer duration
+        const scrollDuration = 60 - (settings.scrollSpeed / 100) * 50; 
+        const messageItems: DisplayItem[] = activeMessages.map(m => ({
+          type: 'message',
+          text: m.content,
+          duration: settings.messageDuration * 1000,
+          fontSize: settings.messageFontSize,
+          scrollDuration: scrollDuration,
+        }));
+        combinedItems.push(...messageItems);
+    }
+    
+    // Shuffle if global randomize is on
     if (settings.randomize) {
       combinedItems = shuffle(combinedItems);
     }
@@ -149,40 +159,39 @@ export function DisplayBoard() {
     if (combinedItems.length > 0) {
       combinedItems.forEach((item) => {
         finalQueue.push(item);
-        if (settings.blankDuration > 0) {
+        if (settings.useBlankScreens && settings.blankDuration > 0) {
             finalQueue.push({ type: 'blank', duration: settings.blankDuration * 1000 });
         }
       });
       // Remove the last blank item as it's redundant
-      if (settings.blankDuration > 0 && finalQueue.length > 0 && finalQueue[finalQueue.length - 1].type === 'blank') {
+      if (settings.useBlankScreens && settings.blankDuration > 0 && finalQueue.length > 0 && finalQueue[finalQueue.length - 1].type === 'blank') {
           finalQueue.pop();
       }
     }
     
     setDisplayQueue(finalQueue);
+    if(finalQueue.length > 0) {
+        setCurrentItem(finalQueue[0]);
+    }
     setIsLoading(false);
   }, []);
 
   // Main display loop effect
   useEffect(() => {
     if (isLoading || displayQueue.length === 0) {
-      return; // Do nothing if still loading or the queue is empty
+      return; 
     }
 
     const item = displayQueue[currentIndex];
     setCurrentItem(item);
 
-    // Ensure duration is a positive number to prevent freezing
-    const duration = item.duration > 0 ? item.duration : 5000; // Default to 5s if duration is 0 or less
+    const duration = item.duration > 0 ? item.duration : 5000;
 
     const timer = setTimeout(() => {
       setCurrentIndex((prevIndex) => (prevIndex + 1) % displayQueue.length);
     }, duration);
 
-    // Cleanup function to clear the timer
-    return () => {
-      clearTimeout(timer);
-    };
+    return () => clearTimeout(timer);
   }, [currentIndex, displayQueue, isLoading]);
 
 
@@ -194,7 +203,7 @@ export function DisplayBoard() {
         return <div className="flex h-full w-full items-center justify-center text-center p-8"><p className="text-2xl text-muted-foreground">No content to display. Add photos or "Active" messages in the admin panel.</p></div>;
     }
     if (!currentItem) {
-        return null; // Don't render anything if there's no current item (briefly, between states)
+        return null;
     }
 
     switch (currentItem.type) {
