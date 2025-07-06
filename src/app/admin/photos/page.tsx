@@ -100,9 +100,10 @@ export default function PhotosPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingPhoto, setEditingPhoto] = useState<Photo | null>(null);
 
-  const [newPhotoFile, setNewPhotoFile] = useState<File | null>(null);
-  const [newPhotoAlt, setNewPhotoAlt] = useState('');
+  const [newPhotoFiles, setNewPhotoFiles] = useState<FileList | null>(null);
   const [newPhotoCategory, setNewPhotoCategory] = useState(activeTab);
+  const [newCategoryName, setNewCategoryName] = useState('');
+
   const [editingPhotoCategory, setEditingPhotoCategory] = useState(activeTab);
 
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
@@ -113,45 +114,117 @@ export default function PhotosPage() {
   } | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setNewPhotoFile(e.target.files[0]);
+    if (e.target.files) {
+      setNewPhotoFiles(e.target.files);
     }
   };
 
-  const handleUploadPhoto = (e: React.FormEvent) => {
+  const handleUploadPhoto = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPhotoFile || !newPhotoAlt.trim()) return;
+    if (!newPhotoFiles || newPhotoFiles.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'No files selected',
+        description: 'Please select one or more photos to upload.',
+      });
+      return;
+    }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const src = event.target?.result as string;
-      const newPhoto = {
-        id: Date.now(),
-        src,
-        alt: newPhotoAlt,
-        'data-ai-hint': newPhotoAlt
-          .toLowerCase()
-          .split(' ')
-          .slice(0, 2)
-          .join(' '),
-      };
+    let targetCategory = newPhotoCategory;
+    if (targetCategory === '__NEW__') {
+      const trimmedName = newCategoryName.trim();
+      if (!trimmedName) {
+        toast({
+          variant: 'destructive',
+          title: 'Invalid Category Name',
+          description: 'New category name cannot be empty.',
+        });
+        return;
+      }
+      if (photoGroups.hasOwnProperty(trimmedName)) {
+        toast({
+          variant: 'destructive',
+          title: 'Category Exists',
+          description: 'A category with this name already exists.',
+        });
+        return;
+      }
+      targetCategory = trimmedName;
+    }
 
-      setPhotoGroups((prev) => ({
-        ...prev,
-        [newPhotoCategory]: [...(prev[newPhotoCategory] || []), newPhoto],
-      }));
+    if (!targetCategory) {
+      toast({
+        variant: 'destructive',
+        title: 'No Category',
+        description: 'Please select or create a category for the photos.',
+      });
+      return;
+    }
+
+    const filesArray = Array.from(newPhotoFiles);
+
+    const readFileAsDataURL = (file: File): Promise<Photo> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const src = event.target?.result as string;
+          const altText = file.name
+            .substring(0, file.name.lastIndexOf('.'))
+            .replace(/[-_]/g, ' ');
+          resolve({
+            id: Date.now() + Math.random(),
+            src,
+            alt: altText,
+            'data-ai-hint': altText
+              .toLowerCase()
+              .split(' ')
+              .slice(0, 2)
+              .join(' '),
+          });
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    };
+
+    try {
+      const newPhotos = await Promise.all(filesArray.map(readFileAsDataURL));
+
+      setPhotoGroups((prev) => {
+        const newGroups = { ...prev };
+        if (!newGroups[targetCategory]) {
+          newGroups[targetCategory] = [];
+        }
+        newGroups[targetCategory].push(...newPhotos);
+        return newGroups;
+      });
+
+      if (newPhotoCategory === '__NEW__') {
+        setActiveTab(targetCategory);
+      }
+
+      toast({
+        title: 'Upload Complete',
+        description: `${filesArray.length} photo(s) added to "${targetCategory}".`,
+      });
 
       // Reset form and close dialog
-      setNewPhotoFile(null);
+      setNewPhotoFiles(null);
       const fileInput = document.getElementById(
         'photo-file'
       ) as HTMLInputElement;
       if (fileInput) fileInput.value = '';
-
-      setNewPhotoAlt('');
+      setNewCategoryName('');
       setIsUploadDialogOpen(false);
-    };
-    reader.readAsDataURL(newPhotoFile);
+    } catch (error) {
+      console.error('Failed to read files for upload', error);
+      toast({
+        variant: 'destructive',
+        title: 'Upload Failed',
+        description:
+          'There was an error processing the photos. Please try again.',
+      });
+    }
   };
 
   const handleDeletePhoto = (id: number) => {
@@ -482,43 +555,41 @@ export default function PhotosPage() {
             onOpenChange={(isOpen) => {
               setIsUploadDialogOpen(isOpen);
               if (isOpen) {
-                setNewPhotoCategory(activeTab);
+                // Reset form state when dialog opens
+                const initialCategory = activeTab || Object.keys(photoGroups)[0] || '';
+                setNewPhotoCategory(initialCategory);
+                setNewCategoryName('');
+                setNewPhotoFiles(null);
+                const fileInput = document.getElementById('photo-file') as HTMLInputElement;
+                if (fileInput) fileInput.value = '';
               }
             }}
           >
             <DialogTrigger asChild>
               <Button>
                 <PlusCircle className="mr-2 h-4 w-4" />
-                Upload Photo
+                Add Photos
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <form onSubmit={handleUploadPhoto}>
                 <DialogHeader>
-                  <DialogTitle>Upload New Photo</DialogTitle>
+                  <DialogTitle>Add Photos</DialogTitle>
                   <DialogDescription>
-                    Select a photo from your device and add details.
+                    Select one or more photos from your device, choose a
+                    category, and upload.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                   <div className="space-y-2">
-                    <Label htmlFor="photo-file">Photo File</Label>
+                    <Label htmlFor="photo-file">Photo File(s)</Label>
                     <Input
                       id="photo-file"
                       type="file"
                       accept="image/*"
                       onChange={handleFileChange}
                       required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="alt-text">Description (Alt Text)</Label>
-                    <Input
-                      id="alt-text"
-                      value={newPhotoAlt}
-                      onChange={(e) => setNewPhotoAlt(e.target.value)}
-                      placeholder="e.g., Family at the beach"
-                      required
+                      multiple
                     />
                   </div>
                   <div className="space-y-2">
@@ -526,6 +597,7 @@ export default function PhotosPage() {
                     <Select
                       value={newPhotoCategory}
                       onValueChange={setNewPhotoCategory}
+                      required
                     >
                       <SelectTrigger id="category">
                         <SelectValue placeholder="Select a category" />
@@ -536,9 +608,25 @@ export default function PhotosPage() {
                             {cat.charAt(0).toUpperCase() + cat.slice(1)}
                           </SelectItem>
                         ))}
+                        <Separator />
+                        <SelectItem value="__NEW__">
+                          -- Create new category --
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
+                   {newPhotoCategory === '__NEW__' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="new-category-name-upload">New Category Name</Label>
+                      <Input
+                        id="new-category-name-upload"
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        placeholder="e.g., Vacation 2024"
+                        required
+                      />
+                    </div>
+                  )}
                 </div>
                 <DialogFooter>
                   <Button
@@ -548,7 +636,7 @@ export default function PhotosPage() {
                   >
                     Cancel
                   </Button>
-                  <Button type="submit">Save Photo</Button>
+                  <Button type="submit">Save Photos</Button>
                 </DialogFooter>
               </form>
             </DialogContent>
@@ -659,7 +747,8 @@ export default function PhotosPage() {
                   <div className="py-12 text-center text-muted-foreground">
                     <p>This category is empty.</p>
                     <p className="text-sm">
-                      Upload a photo to add it to this category.
+                      Use the "Add Photos" button to upload photos to this
+                      category.
                     </p>
                   </div>
                 )}
