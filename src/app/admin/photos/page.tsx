@@ -162,6 +162,7 @@ export default function PhotosPage() {
     }
 
     const filesArray = Array.from(newPhotoFiles);
+    const baseId = Date.now();
 
     const readFileAsDataURL = (file: File, index: number): Promise<Photo> => {
       return new Promise((resolve, reject) => {
@@ -172,7 +173,7 @@ export default function PhotosPage() {
             .substring(0, file.name.lastIndexOf('.'))
             .replace(/[-_]/g, ' ');
           resolve({
-            id: Date.now() + index,
+            id: baseId + index,
             src,
             alt: altText,
             'data-ai-hint': altText
