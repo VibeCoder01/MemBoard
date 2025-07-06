@@ -77,8 +77,8 @@ export default function PhotosPage() {
           setActiveTab(Object.keys(groups)[0]);
         }
     } catch (error) {
-        console.error('Failed to load photo groups from Firestore', error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not load your photo library. Please check your Firebase configuration and refresh the page.' });
+        console.error('Failed to load photo groups from database', error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not load your photo library.' });
     }
     setIsLoading(false);
   }, [toast, activeTab]);

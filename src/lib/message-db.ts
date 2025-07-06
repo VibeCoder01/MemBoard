@@ -1,64 +1,47 @@
-
 'use client';
 
-import { db } from './firebase';
-import {
-  collection,
-  getDocs,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  serverTimestamp,
-  query,
-  orderBy,
-} from 'firebase/firestore';
 import type { Message } from './data';
 
-const checkDb = () => {
-    if (!db) {
-        throw new Error("Firestore is not initialized. Check your Firebase configuration in .env.local.");
-    }
-}
+const jsonHeaders = { 'Content-Type': 'application/json' };
 
 export const getMessages = async (): Promise<Message[]> => {
-    checkDb();
-    const messagesCollection = collection(db!, 'messages');
-    const q = query(messagesCollection, orderBy('createdAt', 'desc'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-    } as Message));
+  const res = await fetch('/api/messages');
+  if (!res.ok) {
+    throw new Error('Failed to load messages');
+  }
+  return res.json();
 };
 
 export const addMessage = async (message: Omit<Message, 'id'>): Promise<string> => {
-    checkDb();
-    const messagesCollection = collection(db!, 'messages');
-    const docRef = await addDoc(messagesCollection, {
-        ...message,
-        createdAt: serverTimestamp(),
-    });
-    return docRef.id;
+  const res = await fetch('/api/messages', {
+    method: 'POST',
+    headers: jsonHeaders,
+    body: JSON.stringify(message),
+  });
+  if (!res.ok) {
+    throw new Error('Failed to add message');
+  }
+  const data = await res.json();
+  return data.id as string;
 };
 
 export const updateMessage = async (id: string, message: Partial<Message>): Promise<void> => {
-    checkDb();
-    const messageDoc = doc(db!, 'messages', id);
-    // remove id from the object to avoid writing it to the document
-    const { id: _, ...updateData } = message;
-    await updateDoc(messageDoc, updateData);
+  await fetch(`/api/messages/${id}` , {
+    method: 'PUT',
+    headers: jsonHeaders,
+    body: JSON.stringify(message),
+  });
 };
 
 export const deleteMessage = async (id: string): Promise<void> => {
-    checkDb();
-    const messageDoc = doc(db!, 'messages', id);
-    await deleteDoc(messageDoc);
+  await fetch(`/api/messages/${id}`, { method: 'DELETE' });
 };
 
 export const getMessageCount = async (): Promise<number> => {
-    checkDb();
-    const messagesCollection = collection(db!, 'messages');
-    const snapshot = await getDocs(messagesCollection);
-    return snapshot.size;
-}
+  const res = await fetch('/api/messages/count');
+  if (!res.ok) {
+    throw new Error('Failed to load message count');
+  }
+  const data = await res.json();
+  return data.count as number;
+};

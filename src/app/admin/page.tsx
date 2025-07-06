@@ -18,7 +18,7 @@ export default function AdminLoginPage({ searchParams }: { searchParams: { error
     'use server';
 
     const password = formData.get('password') as string;
-    // In a real app, you'd use a service like Firebase Auth or NextAuth.js
+    // In a real app, you'd use a service like NextAuth.js or another auth provider
     // and compare hashed passwords.
     if (password === process.env.ADMIN_PASSWORD || password === 'password') {
       // Set a secure, http-only cookie here to manage session

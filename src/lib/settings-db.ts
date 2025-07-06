@@ -1,37 +1,24 @@
-
 'use client';
 
-import { db } from './firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { Settings } from './data';
 import { defaultSettings } from './data';
 
+const jsonHeaders = { 'Content-Type': 'application/json' };
+
 export const getSettings = async (): Promise<Settings> => {
-    if (!db) {
-        // This case handles when Firebase isn't configured.
-        // The display board can still run with default settings.
-        return defaultSettings;
-    }
-    try {
-        const settingsDocRef = doc(db, 'app-config', 'settings');
-        const docSnap = await getDoc(settingsDocRef);
-        if (docSnap.exists()) {
-            return { ...defaultSettings, ...docSnap.data() } as Settings;
-        } else {
-            // If no settings exist in Firestore, create them with default values
-            await setDoc(settingsDocRef, defaultSettings);
-            return defaultSettings;
-        }
-    } catch (error) {
-        console.error("Firestore connection error, using default settings:", error);
-        return defaultSettings;
-    }
+  const res = await fetch('/api/settings');
+  if (!res.ok) {
+    console.error('Failed to load settings from database');
+    return defaultSettings;
+  }
+  const data = await res.json();
+  return { ...defaultSettings, ...data } as Settings;
 };
 
 export const saveSettings = async (settings: Settings): Promise<void> => {
-    if (!db) {
-        throw new Error("Firestore is not initialized. Check your Firebase configuration.");
-    }
-    const settingsDocRef = doc(db, 'app-config', 'settings');
-    await setDoc(settingsDocRef, settings);
+  await fetch('/api/settings', {
+    method: 'POST',
+    headers: jsonHeaders,
+    body: JSON.stringify(settings),
+  });
 };

@@ -11,7 +11,7 @@ export type Photo = {
   src: string;
   alt: string;
   'data-ai-hint': string;
-  storagePath: string; // Path in Firebase Storage to allow for deletion
+  storagePath: string; // File path used for deletion if stored locally
 };
 
 export type PhotoGroups = {

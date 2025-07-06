@@ -27,7 +27,7 @@ export default function DashboardPage() {
     const fetchData = async () => {
         setIsLoading(true);
         try {
-          // Load counts from Firestore
+          // Load counts from SQLite database
           const [msgCount, phtCount] = await Promise.all([
             getMessageCount(),
             getPhotoCount(),
@@ -40,7 +40,7 @@ export default function DashboardPage() {
           toast({
               variant: 'destructive',
               title: 'Error Loading Data',
-              description: 'Could not connect to the database. Please check your Firebase configuration.'
+              description: 'Could not connect to the database.'
           });
           setMessageCount(0);
           setPhotoCount(0);
