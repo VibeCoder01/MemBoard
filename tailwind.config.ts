@@ -84,7 +84,7 @@ export default {
         },
         "scroll-message": {
           "from": { transform: "translateY(100%)" },
-          "to": { transform: "translateY(-100%)" },
+          "to": { transform: "translateY(-200%)" },
         },
       },
       animation: {

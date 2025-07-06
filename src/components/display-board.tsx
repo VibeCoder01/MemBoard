@@ -104,7 +104,8 @@ export function DisplayBoard() {
             const wordCount = text.split(/\s+/).length;
             // Slower speed (higher slider value) means longer duration
             const speedFactor = 150 - settings.scrollSpeed; // e.g., 50 -> 100, 100 -> 50
-            return (wordCount * 0.5 + 5) * (speedFactor / 50) * 1000;
+            // Animation distance is 1.5x longer, so multiply base duration by 1.5
+            return (wordCount * 0.5 + 5) * 1.5 * (speedFactor / 50) * 1000;
         };
 
         const messageItems: DisplayItem[] = activeMessages.map(m => {
@@ -149,11 +150,13 @@ export function DisplayBoard() {
       return;
     }
     
-    setCurrentItem(displayQueue[currentIndex]);
-    setKey(k => k + 1);
+    // Set the item to be displayed
+    const item = displayQueue[currentIndex];
+    setCurrentItem(item);
+    setKey(k => k + 1); // Force re-render for animations
     
-    const currentItemInEffect = displayQueue[currentIndex];
-    const duration = currentItemInEffect?.duration > 0 ? currentItemInEffect.duration : 5000;
+    // Duration for the timeout. Ensure it's a positive number.
+    const duration = item?.duration > 0 ? item.duration : 5000;
 
     const timer = setTimeout(() => {
       setCurrentIndex((prevIndex) => (prevIndex + 1) % displayQueue.length);
