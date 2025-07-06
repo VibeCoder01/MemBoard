@@ -61,7 +61,7 @@ export default function PhotosPage() {
   const [photoGroups, setPhotoGroups] = useState<PhotoGroups>({});
   const [activeTab, setActiveTab] = useState('');
 
-  // Load from localStorage on component mount and clean up duplicates
+  // Load from localStorage on component mount, de-duplicate, and migrate ID formats.
   useEffect(() => {
     try {
       const savedGroupsJSON = localStorage.getItem('photoGroups');
@@ -73,21 +73,32 @@ export default function PhotosPage() {
         loadedGroups = initialPhotoGroups;
       }
       
-      // De-duplicate photos to fix legacy data issues.
-      // This is the key part of the fix for existing bad data.
-      const seenIds = new Set<string>();
+      // De-duplicate photos and migrate old ID formats for consistency.
+      const seenOriginalIds = new Set<string>();
       const cleanedGroups: PhotoGroups = {};
+      // Simple regex to check for old numeric or timestamp-based IDs.
+      const isOldIdFormat = (id: string) => /^\d+(\.\d+)?$/.test(id);
+
       for (const category in loadedGroups) {
           if (Array.isArray(loadedGroups[category])) {
             cleanedGroups[category] = [];
             for (const photo of loadedGroups[category]) {
-                const photoId = photo?.id?.toString();
-                if (photoId && !seenIds.has(photoId)) {
-                    // Create a new photo object with the ID as a string to migrate old data.
-                    const cleanedPhoto: Photo = {...photo, id: photoId};
-                    cleanedGroups[category].push(cleanedPhoto);
-                    seenIds.add(photoId);
+                const originalId = photo?.id?.toString();
+
+                // Skip if no ID or if we've already processed this original ID (de-duplication).
+                if (!originalId || seenOriginalIds.has(originalId)) {
+                    continue; 
                 }
+                seenOriginalIds.add(originalId);
+                
+                // If the ID is in the old numeric format, generate a new UUID for it.
+                // Otherwise, keep the existing (already a UUID) ID.
+                const finalId = isOldIdFormat(originalId) 
+                  ? crypto.randomUUID() 
+                  : originalId;
+
+                const cleanedPhoto: Photo = {...photo, id: finalId};
+                cleanedGroups[category].push(cleanedPhoto);
             }
           }
       }
