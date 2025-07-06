@@ -13,36 +13,42 @@ import {
 import { Button } from '@/components/ui/button';
 import { ArrowUpRight, MessageSquare, Image as ImageIcon } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { initialMessages } from '@/lib/data';
+import { getMessageCount } from '@/lib/message-db';
 import { getPhotoCount } from '@/lib/photo-db';
+import { useToast } from '@/hooks/use-toast';
 
 export default function DashboardPage() {
   const [messageCount, setMessageCount] = useState(0);
   const [photoCount, setPhotoCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchData = async () => {
         setIsLoading(true);
         try {
-          // Load and count messages from localStorage
-          const savedMessages = localStorage.getItem('messages');
-          setMessageCount(savedMessages ? JSON.parse(savedMessages).length : initialMessages.length);
-          
-          // Load and count photos from IndexedDB
-          const count = await getPhotoCount();
-          setPhotoCount(count);
+          // Load counts from Firestore
+          const [msgCount, phtCount] = await Promise.all([
+            getMessageCount(),
+            getPhotoCount(),
+          ]);
+          setMessageCount(msgCount);
+          setPhotoCount(phtCount);
 
         } catch (error) {
           console.error("Failed to load dashboard data", error);
-          // Fallback to initial counts on error
-          setMessageCount(initialMessages.length);
-          setPhotoCount(0); // Can't access initial photos easily, so fallback to 0
+          toast({
+              variant: 'destructive',
+              title: 'Error Loading Data',
+              description: 'Could not connect to the database. Please check your Firebase configuration.'
+          });
+          setMessageCount(0);
+          setPhotoCount(0);
         }
         setIsLoading(false);
     }
     fetchData();
-  }, []);
+  }, [toast]);
 
   return (
     <div className="flex-1 space-y-4">

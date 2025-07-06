@@ -5,8 +5,10 @@ import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import type { Message, Photo, PhotoGroups, Settings } from '@/lib/data';
-import { defaultSettings, initialMessages } from '@/lib/data';
+import { defaultSettings } from '@/lib/data';
 import { getPhotoGroups } from '@/lib/photo-db';
+import { getMessages } from '@/lib/message-db';
+import { getSettings } from '@/lib/settings-db';
 
 
 type DisplayItem = {
@@ -48,22 +50,21 @@ export function DisplayBoard({
   // Effect to load data and build the queue once
   useEffect(() => {
     const buildQueue = async () => {
+        setIsLoading(true);
+        onStatusChange('Initializing: Loading content from database...');
         try {
-          const savedSettings = localStorage.getItem('displaySettings');
-          const loadedSettings = savedSettings 
-            ? { ...defaultSettings, ...JSON.parse(savedSettings) } 
-            : defaultSettings;
+          const [loadedSettings, messages, photoGroups] = await Promise.all([
+            getSettings(),
+            getMessages(),
+            getPhotoGroups(),
+          ]);
+
           setSettings(loadedSettings);
 
           const monitor = loadedSettings.monitorActivity;
           if (monitor) {
-            onStatusChange('Initializing: Loading content...');
+            onStatusChange('Initializing: Building display queue...');
           }
-
-          const savedMessages = localStorage.getItem('messages');
-          const messages: Message[] = savedMessages ? JSON.parse(savedMessages) : initialMessages;
-          
-          const photoGroups: PhotoGroups = await getPhotoGroups();
           
           let contentItems: DisplayItem[] = [];
 
@@ -74,7 +75,7 @@ export function DisplayBoard({
                   photoList = shuffle(photoList);
               } else {
                   const groupedList: Photo[] = [];
-                  const categories = Object.keys(photoGroups);
+                  const categories = Object.keys(photoGroups).sort();
                   for (const category of categories) {
                       let groupPhotos = photoGroups[category] || [];
                       if (loadedSettings.randomizeInPhotoGroups) {
@@ -85,7 +86,7 @@ export function DisplayBoard({
                   photoList = groupedList;
               }
               const photoItems: DisplayItem[] = photoList
-                .filter(p => p && p.src) // extra safety check
+                .filter(p => p && p.src)
                 .map(p => ({
                   type: 'photo',
                   src: p.src,
@@ -102,7 +103,7 @@ export function DisplayBoard({
               const getMessageDuration = (text: string) => {
                 const baseDuration = (text.split(/\s+/).length * 0.5 + 5) * 1000;
                 const scrollFactor = (150 - loadedSettings.scrollSpeed) / 50; 
-                const animationDistanceFactor = 2; // This ensures it scrolls off screen
+                const animationDistanceFactor = 2;
                 return baseDuration * scrollFactor * animationDistanceFactor;
               };
               const messageItems: DisplayItem[] = activeMessages.map(m => ({
@@ -143,14 +144,15 @@ export function DisplayBoard({
           setDisplayQueue(finalQueue);
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Unknown error';
-            onStatusChange(`Error: Failed to load data. ${message}`);
+            onStatusChange(`Error: Failed to load data. Check Firebase config. ${message}`);
             console.error("Failed to load data from storage", error);
         } finally {
             setIsLoading(false);
         }
     }
     buildQueue();
-  }, [onStatusChange]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Effect to manage the display timer loop
   useEffect(() => {
@@ -201,7 +203,7 @@ export function DisplayBoard({
         return <div className="flex h-full w-full items-center justify-center"><p className="text-2xl text-muted-foreground">Initializing MemBoard...</p></div>;
     }
     if (!currentItem) {
-        return <div className="flex h-full w-full items-center justify-center text-center p-8"><p className="text-2xl text-muted-foreground">No content to display. Enable photos or messages in the admin panel.</p></div>;
+        return <div className="flex h-full w-full items-center justify-center text-center p-8"><p className="text-2xl text-muted-foreground">No content to display. Visit the admin panel to add photos or messages.</p></div>;
     }
 
     switch (currentItem.type) {

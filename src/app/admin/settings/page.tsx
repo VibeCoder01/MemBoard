@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -16,25 +17,30 @@ import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
 import type { Settings } from '@/lib/data';
 import { defaultSettings } from '@/lib/data';
+import { getSettings, saveSettings } from '@/lib/settings-db';
 
 export default function SettingsPage() {
   const { toast } = useToast();
   const [settings, setSettings] = useState<Settings>(defaultSettings);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const savedSettings = localStorage.getItem('displaySettings');
-      if (savedSettings) {
-        setSettings({ ...defaultSettings, ...JSON.parse(savedSettings) });
-      }
-    } catch (error) {
-      console.error("Failed to load settings from localStorage", error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Could not load saved settings.',
-      });
+    const fetchSettings = async () => {
+        setIsLoading(true);
+        try {
+            const dbSettings = await getSettings();
+            setSettings(dbSettings);
+        } catch (error) {
+            console.error("Failed to load settings from Firestore", error);
+            toast({
+                variant: 'destructive',
+                title: 'Error',
+                description: 'Could not load saved settings. Using defaults.',
+            });
+        }
+        setIsLoading(false);
     }
+    fetchSettings();
   }, [toast]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -50,15 +56,15 @@ export default function SettingsPage() {
     setSettings((prev) => ({ ...prev, [id]: value[0] }));
   };
 
-  const handleSaveChanges = () => {
+  const handleSaveChanges = async () => {
     try {
-      localStorage.setItem('displaySettings', JSON.stringify(settings));
+      await saveSettings(settings);
       toast({
         title: 'Settings Saved',
         description: 'Your configuration has been updated successfully.',
       });
     } catch (error) {
-      console.error("Failed to save settings to localStorage", error);
+      console.error("Failed to save settings to Firestore", error);
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -75,6 +81,7 @@ export default function SettingsPage() {
     });
   };
 
+  const isDisabled = isLoading;
 
   return (
     <div className="flex-1 space-y-4">
@@ -83,8 +90,8 @@ export default function SettingsPage() {
           Configuration Settings
         </h1>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleResetToDefaults}>Reset to Defaults</Button>
-          <Button onClick={handleSaveChanges}>Save Changes</Button>
+          <Button variant="outline" onClick={handleResetToDefaults} disabled={isDisabled}>Reset to Defaults</Button>
+          <Button onClick={handleSaveChanges} disabled={isDisabled}>Save Changes</Button>
         </div>
       </div>
       <Card>
@@ -97,11 +104,11 @@ export default function SettingsPage() {
         <CardContent className="space-y-6">
             <div className="space-y-2">
                 <Label htmlFor="photoDuration">Photo Display Duration (seconds)</Label>
-                <Input id="photoDuration" type="number" value={settings.photoDuration} onChange={handleInputChange} />
+                <Input id="photoDuration" type="number" value={settings.photoDuration} onChange={handleInputChange} disabled={isDisabled}/>
             </div>
             <div className="space-y-2">
                 <Label htmlFor="blankDuration">Blank Screen Pause (seconds)</Label>
-                <Input id="blankDuration" type="number" value={settings.blankDuration} onChange={handleInputChange} />
+                <Input id="blankDuration" type="number" value={settings.blankDuration} onChange={handleInputChange} disabled={isDisabled}/>
             </div>
         </CardContent>
       </Card>
@@ -120,7 +127,7 @@ export default function SettingsPage() {
                         Include photos in the display rotation.
                     </span>
                 </Label>
-                <Switch id="displayPhotos" checked={settings.displayPhotos} onCheckedChange={(checked) => handleSwitchChange('displayPhotos', checked)}/>
+                <Switch id="displayPhotos" checked={settings.displayPhotos} onCheckedChange={(checked) => handleSwitchChange('displayPhotos', checked)} disabled={isDisabled}/>
             </div>
              <div className="flex items-center justify-between">
                 <Label htmlFor="displayMessages" className="flex flex-col space-y-1">
@@ -129,7 +136,7 @@ export default function SettingsPage() {
                         Include messages in the display rotation.
                     </span>
                 </Label>
-                <Switch id="displayMessages" checked={settings.displayMessages} onCheckedChange={(checked) => handleSwitchChange('displayMessages', checked)}/>
+                <Switch id="displayMessages" checked={settings.displayMessages} onCheckedChange={(checked) => handleSwitchChange('displayMessages', checked)} disabled={isDisabled}/>
             </div>
              <div className="flex items-center justify-between">
                 <Label htmlFor="useBlankScreens" className="flex flex-col space-y-1">
@@ -138,7 +145,7 @@ export default function SettingsPage() {
                         Show a blank screen between each content item.
                     </span>
                 </Label>
-                <Switch id="useBlankScreens" checked={settings.useBlankScreens} onCheckedChange={(checked) => handleSwitchChange('useBlankScreens', checked)}/>
+                <Switch id="useBlankScreens" checked={settings.useBlankScreens} onCheckedChange={(checked) => handleSwitchChange('useBlankScreens', checked)} disabled={isDisabled}/>
             </div>
             <div className="flex items-center justify-between">
                 <Label htmlFor="randomize" className="flex flex-col space-y-1">
@@ -147,7 +154,7 @@ export default function SettingsPage() {
                         Show photos and messages in a random order.
                     </span>
                 </Label>
-                <Switch id="randomize" checked={settings.randomize} onCheckedChange={(checked) => handleSwitchChange('randomize', checked)}/>
+                <Switch id="randomize" checked={settings.randomize} onCheckedChange={(checked) => handleSwitchChange('randomize', checked)} disabled={isDisabled}/>
             </div>
              <div className="flex items-center justify-between">
                 <Label htmlFor="randomizeAllPhotos" className="flex flex-col space-y-1">
@@ -156,7 +163,7 @@ export default function SettingsPage() {
                         If enabled, ignores groups and shuffles all photos together.
                     </span>
                 </Label>
-                <Switch id="randomizeAllPhotos" checked={settings.randomizeAllPhotos} onCheckedChange={(checked) => handleSwitchChange('randomizeAllPhotos', checked)} />
+                <Switch id="randomizeAllPhotos" checked={settings.randomizeAllPhotos} onCheckedChange={(checked) => handleSwitchChange('randomizeAllPhotos', checked)} disabled={isDisabled}/>
             </div>
              <div className="flex items-center justify-between">
                 <Label htmlFor="randomizeInPhotoGroups" className="flex flex-col space-y-1">
@@ -165,7 +172,7 @@ export default function SettingsPage() {
                         Shuffles the order of photos inside each group.
                     </span>
                 </Label>
-                <Switch id="randomizeInPhotoGroups" checked={settings.randomizeInPhotoGroups} onCheckedChange={(checked) => handleSwitchChange('randomizeInPhotoGroups', checked)} />
+                <Switch id="randomizeInPhotoGroups" checked={settings.randomizeInPhotoGroups} onCheckedChange={(checked) => handleSwitchChange('randomizeInPhotoGroups', checked)} disabled={isDisabled}/>
             </div>
             <div className="flex items-center justify-between">
                 <Label htmlFor="monitorActivity" className="flex flex-col space-y-1">
@@ -174,15 +181,15 @@ export default function SettingsPage() {
                         Show detailed activity status in the view mode footer.
                     </span>
                 </Label>
-                <Switch id="monitorActivity" checked={settings.monitorActivity} onCheckedChange={(checked) => handleSwitchChange('monitorActivity', checked)}/>
+                <Switch id="monitorActivity" checked={settings.monitorActivity} onCheckedChange={(checked) => handleSwitchChange('monitorActivity', checked)} disabled={isDisabled}/>
             </div>
             <div className="space-y-3">
                 <Label htmlFor="scrollSpeed">Message Scroll Speed ({settings.scrollSpeed}%)</Label>
-                <Slider id="scrollSpeed" value={[settings.scrollSpeed]} onValueChange={(value) => handleSliderChange('scrollSpeed', value)} max={100} step={1} />
+                <Slider id="scrollSpeed" value={[settings.scrollSpeed]} onValueChange={(value) => handleSliderChange('scrollSpeed', value)} max={100} step={1} disabled={isDisabled}/>
             </div>
             <div className="space-y-3">
                 <Label htmlFor="messageFontSize">Message Font Size ({settings.messageFontSize}px)</Label>
-                <Slider id="messageFontSize" value={[settings.messageFontSize]} onValueChange={(value) => handleSliderChange('messageFontSize', value)} min={24} max={250} step={1} />
+                <Slider id="messageFontSize" value={[settings.messageFontSize]} onValueChange={(value) => handleSliderChange('messageFontSize', value)} min={24} max={250} step={1} disabled={isDisabled}/>
             </div>
         </CardContent>
       </Card>

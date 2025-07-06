@@ -1,196 +1,125 @@
 
 'use client';
 
+import { db, storage } from './firebase';
+import {
+  collection,
+  getDocs,
+  addDoc,
+  deleteDoc,
+  doc,
+  updateDoc,
+  query,
+  where,
+  writeBatch,
+} from 'firebase/firestore';
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject,
+} from 'firebase/storage';
 import type { Photo, PhotoGroups } from '@/lib/data';
-import { initialPhotoGroups } from './data';
 
-const DB_NAME = 'MemBoardPhotoDB';
-const DB_VERSION = 1;
-const PHOTO_STORE_NAME = 'photos';
+const photosCollection = collection(db, 'photos');
 
-// We store the group name along with the photo data.
-interface StoredPhoto extends Photo {
-  group: string;
-}
-
-const openDB = (): Promise<IDBDatabase> => {
-  return new Promise((resolve, reject) => {
-    if (typeof window === 'undefined' || !window.indexedDB) {
-        return reject(new Error('IndexedDB is not supported.'));
-    }
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onerror = () => reject(new Error('Failed to open IndexedDB.'));
-    request.onsuccess = () => resolve(request.result);
-    request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result;
-      if (!db.objectStoreNames.contains(PHOTO_STORE_NAME)) {
-        const store = db.createObjectStore(PHOTO_STORE_NAME, { keyPath: 'id' });
-        store.createIndex('group', 'group', { unique: false });
-      }
-    };
-  });
+// Type for Firestore document
+type StoredPhoto = Omit<Photo, 'id'> & {
+    group: string;
 };
 
 export const getPhotoGroups = async (): Promise<PhotoGroups> => {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(PHOTO_STORE_NAME, 'readonly');
-    const store = transaction.objectStore(PHOTO_STORE_NAME);
-    const request = store.getAll();
-
-    request.onerror = () => reject(new Error('Failed to get photos.'));
-    request.onsuccess = () => {
-      const allPhotos: StoredPhoto[] = request.result;
-      const groups: PhotoGroups = {};
-      for (const photo of allPhotos) {
-        if (!groups[photo.group]) {
-          groups[photo.group] = [];
+    const snapshot = await getDocs(photosCollection);
+    const groups: PhotoGroups = {};
+    snapshot.docs.forEach(doc => {
+        const data = doc.data() as StoredPhoto;
+        // The document ID from firestore is the photo's ID
+        const photo: Photo = { id: doc.id, ...data };
+        if (!groups[data.group]) {
+            groups[data.group] = [];
         }
-        const { group, ...photoData } = photo;
-        groups[photo.group].push(photoData);
-      }
-      resolve(groups);
-    };
-  });
+        groups[data.group].push(photo);
+    });
+    return groups;
 };
 
 export const getPhotoCount = async (): Promise<number> => {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(PHOTO_STORE_NAME, 'readonly');
-        const store = transaction.objectStore(PHOTO_STORE_NAME);
-        const request = store.count();
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(new Error('Failed to count photos.'));
-    });
+    const snapshot = await getDocs(photosCollection);
+    return snapshot.size;
 };
 
-export const addPhotos = async (photos: Photo[], group: string): Promise<void> => {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(PHOTO_STORE_NAME, 'readwrite');
-    const store = transaction.objectStore(PHOTO_STORE_NAME);
-    
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(new Error('Transaction failed to add photos.'));
+export const addPhotos = async (files: File[], group: string): Promise<Photo[]> => {
+    const newPhotos: Photo[] = [];
+    for (const file of files) {
+        const uniqueId = crypto.randomUUID();
+        const storagePath = `photos/${uniqueId}-${file.name}`;
+        const storageRef = ref(storage, storagePath);
 
-    photos.forEach(photo => {
-      const storedPhoto: StoredPhoto = { ...photo, group };
-      store.add(storedPhoto);
-    });
-  });
-};
+        // Upload file to Firebase Storage
+        await uploadBytes(storageRef, file);
+        const downloadURL = await getDownloadURL(storageRef);
+        
+        const altText = file.name.substring(0, file.name.lastIndexOf('.')).replace(/[-_]/g, ' ');
 
-export const deletePhoto = async (id: string): Promise<void> => {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(PHOTO_STORE_NAME, 'readwrite');
-    const store = transaction.objectStore(PHOTO_STORE_NAME);
-    const request = store.delete(id);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(new Error('Failed to delete photo.'));
-  });
-};
-
-export const updatePhoto = async (photo: Photo, newGroup: string): Promise<void> => {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(PHOTO_STORE_NAME, 'readwrite');
-        const store = transaction.objectStore(PHOTO_STORE_NAME);
-        const storedPhoto: StoredPhoto = { ...photo, group: newGroup };
-        const request = store.put(storedPhoto);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(new Error('Failed to update photo.'));
-    });
-};
-
-export const renamePhotoCategory = async (oldName: string, newName: string): Promise<void> => {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(PHOTO_STORE_NAME, 'readwrite');
-        const store = transaction.objectStore(PHOTO_STORE_NAME);
-        const index = store.index('group');
-        const request = index.openCursor(IDBKeyRange.only(oldName));
-
-        request.onerror = () => reject(new Error('Failed to rename category.'));
-        request.onsuccess = () => {
-            const cursor = request.result;
-            if (cursor) {
-                const updatedPhoto = { ...cursor.value, group: newName };
-                cursor.update(updatedPhoto);
-                cursor.continue();
-            }
+        const photoData: Omit<StoredPhoto, 'id'> = {
+            src: downloadURL,
+            alt: altText,
+            'data-ai-hint': altText.toLowerCase().split(' ').slice(0, 2).join(' '),
+            storagePath: storagePath,
+            group: group,
         };
-        transaction.oncomplete = () => resolve();
+
+        // Add photo metadata to Firestore
+        const docRef = await addDoc(photosCollection, photoData);
+        newPhotos.push({ id: docRef.id, ...photoData });
+    }
+    return newPhotos;
+};
+
+export const deletePhoto = async (photo: Photo): Promise<void> => {
+    // Delete file from Storage
+    const storageRef = ref(storage, photo.storagePath);
+    await deleteObject(storageRef);
+
+    // Delete doc from Firestore
+    const photoDoc = doc(db, 'photos', photo.id);
+    await deleteDoc(photoDoc);
+};
+
+export const updatePhoto = async (id: string, newGroup: string, photoData: Partial<Photo>): Promise<void> => {
+    const photoDoc = doc(db, 'photos', id);
+    const { id: _, ...updateData } = photoData;
+    await updateDoc(photoDoc, { ...updateData, group: newGroup });
+};
+
+export const renamePhotoCategory = async (oldName: string, newName:string): Promise<void> => {
+    const q = query(photosCollection, where('group', '==', oldName));
+    const snapshot = await getDocs(q);
+    const batch = writeBatch(db);
+    snapshot.docs.forEach(doc => {
+        batch.update(doc.ref, { group: newName });
     });
+    await batch.commit();
 };
 
 export const deletePhotoCategory = async (categoryName: string): Promise<void> => {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(PHOTO_STORE_NAME, 'readwrite');
-        const store = transaction.objectStore(PHOTO_STORE_NAME);
-        const index = store.index('group');
-        const request = index.openCursor(IDBKeyRange.only(categoryName));
+    const q = query(photosCollection, where('group', '==', categoryName));
+    const snapshot = await getDocs(q);
+    
+    const batch = writeBatch(db);
+    const deletePromises: Promise<void>[] = [];
 
-        request.onerror = () => reject(new Error('Failed to delete category photos.'));
-        request.onsuccess = () => {
-            const cursor = request.result;
-            if (cursor) {
-                cursor.delete();
-                cursor.continue();
-            }
-        };
-        transaction.oncomplete = () => resolve();
+    snapshot.docs.forEach(doc => {
+        const photo = doc.data() as StoredPhoto;
+        // Delete file from storage
+        if (photo.storagePath) {
+            const storageRef = ref(storage, photo.storagePath);
+            deletePromises.push(deleteObject(storageRef));
+        }
+        // Delete doc from firestore
+        batch.delete(doc.ref);
     });
-};
 
-export const migrateFromLocalStorage = async (): Promise<boolean> => {
-    const migrationKey = 'photoMigrationV1Complete';
-    if (localStorage.getItem(migrationKey)) {
-        return false; // No migration needed
-    }
-
-    try {
-        const savedGroupsJSON = localStorage.getItem('photoGroups');
-        const groupsToMigrate = savedGroupsJSON ? JSON.parse(savedGroupsJSON) : initialPhotoGroups;
-
-        if (!groupsToMigrate || Object.keys(groupsToMigrate).length === 0) {
-            localStorage.setItem(migrationKey, 'true');
-            return false;
-        }
-
-        const db = await openDB();
-        const transaction = db.transaction(PHOTO_STORE_NAME, 'readwrite');
-        const store = transaction.objectStore(PHOTO_STORE_NAME);
-        
-        for (const category in groupsToMigrate) {
-            if (Array.isArray(groupsToMigrate[category])) {
-                for (const photo of groupsToMigrate[category]) {
-                    if (photo && photo.id && photo.src) {
-                        const storedPhoto: StoredPhoto = { ...photo, group: category };
-                        store.add(storedPhoto);
-                    }
-                }
-            }
-        }
-        
-        return new Promise((resolve, reject) => {
-            transaction.oncomplete = () => {
-                localStorage.setItem(migrationKey, 'true');
-                localStorage.removeItem('photoGroups'); // Clean up old data
-                console.log('Photo migration from localStorage to IndexedDB complete.');
-                resolve(true); // Migration was performed
-            };
-            transaction.onerror = (event) => {
-                console.error('Photo migration failed.', event);
-                reject(new Error('Migration transaction failed.'));
-            };
-        });
-
-    } catch (error) {
-        console.error("Error during photo migration:", error);
-        // Don't set migration key on error, so it can be retried.
-        return false;
-    }
+    await Promise.all(deletePromises);
+    await batch.commit();
 };

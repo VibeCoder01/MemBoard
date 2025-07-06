@@ -2,7 +2,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   CardContent,
@@ -53,7 +53,6 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Photo, PhotoGroups } from '@/lib/data';
-import { initialPhotoGroups } from '@/lib/data';
 import {
   getPhotoGroups,
   addPhotos,
@@ -61,7 +60,6 @@ import {
   updatePhoto,
   renamePhotoCategory,
   deletePhotoCategory,
-  migrateFromLocalStorage,
 } from '@/lib/photo-db';
 
 export default function PhotosPage() {
@@ -69,60 +67,44 @@ export default function PhotosPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [photoGroups, setPhotoGroups] = useState<PhotoGroups>({});
   const [activeTab, setActiveTab] = useState('');
-
-  // Load from IndexedDB on component mount, and run migration
-  useEffect(() => {
-    const loadPhotos = async () => {
-        setIsLoading(true);
-        try {
-            const migrated = await migrateFromLocalStorage();
-            if (migrated) {
-                toast({ title: 'Photo library updated', description: 'Your photos have been moved to a new, more robust storage system.' });
-            }
-            const groups = await getPhotoGroups();
-
-            // If DB is empty after potential migration, load initial data
-            if (Object.keys(groups).length === 0) {
-              await addPhotos(initialPhotoGroups.family, 'family');
-              await addPhotos(initialPhotoGroups.events, 'events');
-              await addPhotos(initialPhotoGroups.scenery, 'scenery');
-              const initialGroups = await getPhotoGroups();
-              setPhotoGroups(initialGroups);
-            } else {
-              setPhotoGroups(groups);
-            }
-            
-        } catch (error) {
-            console.error('Failed to load photo groups from IndexedDB', error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not load your photo library. Please refresh the page.' });
+  
+  const fetchPhotos = useCallback(async () => {
+    setIsLoading(true);
+    try {
+        const groups = await getPhotoGroups();
+        setPhotoGroups(groups);
+        if (Object.keys(groups).length > 0 && !Object.keys(groups).includes(activeTab)) {
+          setActiveTab(Object.keys(groups)[0]);
         }
-        setIsLoading(false);
-    };
-    loadPhotos();
-  }, [toast]);
-
-
-  // Keep activeTab in sync with available categories
-  useEffect(() => {
-    if (!isLoading) {
-      const categories = Object.keys(photoGroups);
-      if (categories.length > 0 && !categories.includes(activeTab)) {
-        setActiveTab(categories[0]);
-      } else if (categories.length === 0) {
-        setActiveTab('');
-      }
+    } catch (error) {
+        console.error('Failed to load photo groups from Firestore', error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not load your photo library. Please check your Firebase configuration and refresh the page.' });
     }
-  }, [photoGroups, isLoading, activeTab]);
+    setIsLoading(false);
+  }, [toast, activeTab]);
+
+  useEffect(() => {
+    fetchPhotos();
+  }, [fetchPhotos]);
+
+  useEffect(() => {
+    const categories = Object.keys(photoGroups);
+    if (categories.length > 0 && !categories.includes(activeTab)) {
+      setActiveTab(categories[0]);
+    } else if (categories.length === 0) {
+      setActiveTab('');
+    }
+  }, [photoGroups, activeTab]);
 
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingPhoto, setEditingPhoto] = useState<Photo | null>(null);
 
   const [newPhotoFiles, setNewPhotoFiles] = useState<FileList | null>(null);
-  const [newPhotoCategory, setNewPhotoCategory] = useState(activeTab);
+  const [newPhotoCategory, setNewPhotoCategory] = useState('');
   const [newCategoryName, setNewCategoryName] = useState('');
 
-  const [editingPhotoCategory, setEditingPhotoCategory] = useState(activeTab);
+  const [editingPhotoCategory, setEditingPhotoCategory] = useState('');
 
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [newCategoryInput, setNewCategoryInput] = useState('');
@@ -168,37 +150,9 @@ export default function PhotosPage() {
     }
 
     const filesArray = Array.from(newPhotoFiles);
-    
-    const readFileAsDataURL = (file: File): Promise<Photo> => {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const src = event.target?.result as string;
-          const altText = file.name.substring(0, file.name.lastIndexOf('.')).replace(/[-_]/g, ' ');
-          resolve({
-            id: crypto.randomUUID(),
-            src,
-            alt: altText,
-            'data-ai-hint': altText.toLowerCase().split(' ').slice(0, 2).join(' '),
-          });
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-    };
 
     try {
-      const newPhotos = await Promise.all(filesArray.map(file => readFileAsDataURL(file)));
-      await addPhotos(newPhotos, targetCategory);
-      
-      setPhotoGroups((prev) => {
-        const newGroups = { ...prev };
-        if (!newGroups[targetCategory]) newGroups[targetCategory] = [];
-        newGroups[targetCategory].push(...newPhotos);
-        return newGroups;
-      });
-
-      if (newPhotoCategory === '__NEW__') setActiveTab(targetCategory);
+      await addPhotos(filesArray, targetCategory);
 
       toast({ title: 'Upload Complete', description: `${filesArray.length} photo(s) added to "${targetCategory}".` });
       setNewPhotoFiles(null);
@@ -206,27 +160,20 @@ export default function PhotosPage() {
       if (fileInput) fileInput.value = '';
       setNewCategoryName('');
       setIsUploadDialogOpen(false);
+      fetchPhotos();
+      if (newPhotoCategory === '__NEW__') setActiveTab(targetCategory);
 
     } catch (error) {
-      console.error('Failed to read files or save to DB', error);
+      console.error('Failed to upload photos', error);
       toast({ variant: 'destructive', title: 'Upload Failed', description: 'There was an error processing or saving the photos.' });
     }
   };
 
-  const handleDeletePhoto = async (id: string, category: string) => {
+  const handleDeletePhoto = async (photo: Photo) => {
     try {
-        await deletePhoto(id);
-        setPhotoGroups(prev => {
-            const newGroups = { ...prev };
-            newGroups[category] = newGroups[category].filter(p => p.id !== id);
-            if (newGroups[category].length === 0) {
-              delete newGroups[category];
-              const remainingCategories = Object.keys(newGroups);
-              setActiveTab(remainingCategories[0] || '');
-            }
-            return newGroups;
-        });
+        await deletePhoto(photo);
         toast({ title: "Success", description: "Photo deleted from the library." });
+        fetchPhotos();
     } catch (error) {
         console.error("Failed to delete photo", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not delete the photo.' });
@@ -249,13 +196,11 @@ export default function PhotosPage() {
     if (!editingPhoto) return;
 
     try {
-        await updatePhoto(editingPhoto, editingPhotoCategory);
-        const updatedGroups = await getPhotoGroups();
-        setPhotoGroups(updatedGroups);
-
+        await updatePhoto(editingPhoto.id, editingPhotoCategory, editingPhoto);
         setIsEditDialogOpen(false);
         setEditingPhoto(null);
         toast({ title: "Success", description: "Photo details have been updated." });
+        fetchPhotos();
     } catch(error) {
         console.error("Failed to update photo", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not update photo details.' });
@@ -267,7 +212,7 @@ export default function PhotosPage() {
     if (!open) setEditingPhoto(null);
   };
 
-  const handleAddCategory = async (e: React.FormEvent) => {
+  const handleAddCategory = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedName = newCategoryInput.trim();
     if (trimmedName && !photoGroups.hasOwnProperty(trimmedName)) {
@@ -287,16 +232,8 @@ export default function PhotosPage() {
     
     try {
       await deletePhotoCategory(categoryName);
-      if (activeTab === categoryName) {
-        const remainingCategories = Object.keys(photoGroups).filter(c => c !== categoryName);
-        setActiveTab(remainingCategories[0] || '');
-      }
-      setPhotoGroups(prev => {
-          const newGroups = { ...prev };
-          delete newGroups[categoryName];
-          return newGroups;
-      });
       toast({ title: "Category Deleted", description: `The "${categoryName}" category has been removed.` });
+      fetchPhotos();
     } catch (error) {
       console.error("Failed to delete category", error);
       toast({ variant: 'destructive', title: 'Error', description: 'Could not delete the category.' });
@@ -324,11 +261,10 @@ export default function PhotosPage() {
     
     try {
       await renamePhotoCategory(oldName, trimmedNewName);
-      const updatedGroups = await getPhotoGroups();
-      setPhotoGroups(updatedGroups);
-      if (activeTab === oldName) setActiveTab(trimmedNewName);
       setRenamingCategory(null);
       toast({ title: "Category Renamed", description: `"${oldName}" is now "${trimmedNewName}".` });
+      fetchPhotos();
+      setActiveTab(trimmedNewName);
     } catch (error) {
       console.error("Failed to rename category", error);
       toast({ variant: 'destructive', title: 'Error', description: 'Could not rename the category.' });
@@ -357,7 +293,7 @@ export default function PhotosPage() {
               <Skeleton className="h-10 w-24" />
             </div>
             <div className="py-12 text-center text-muted-foreground">
-              <p>Loading and optimizing photo library...</p>
+              <p>Loading photo library from database...</p>
             </div>
           </CardContent>
         </Card>
@@ -401,7 +337,7 @@ export default function PhotosPage() {
                             <AlertDialog>
                               <AlertDialogTrigger asChild><Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" disabled={Object.keys(photoGroups).length <= 1}>Delete</Button></AlertDialogTrigger>
                               <AlertDialogContent>
-                                <AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action will permanently delete the "{category}" category and all photos within it.</AlertDialogDescription></AlertDialogHeader>
+                                <AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action will permanently delete the "{category}" category and all photos within it from the database.</AlertDialogDescription></AlertDialogHeader>
                                 <AlertDialogFooter>
                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                                   <AlertDialogAction className={buttonVariants({ variant: 'destructive' })} onClick={() => handleDeleteCategory(category)}>Delete</AlertDialogAction>
@@ -491,7 +427,7 @@ export default function PhotosPage() {
               <TabsContent key={category} value={category} className="mt-4">
                 {photos.length > 0 ? (
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {photos.map((p) => (<PhotoCard key={p.id} photo={p} category={category} onDelete={handleDeletePhoto} onEdit={handleEditClick}/>))}
+                    {photos.map((p) => (<PhotoCard key={p.id} photo={p} onDelete={handleDeletePhoto} onEdit={handleEditClick}/>))}
                   </div>
                 ) : (
                   <div className="py-12 text-center text-muted-foreground">
@@ -501,6 +437,12 @@ export default function PhotosPage() {
                 )}
               </TabsContent>
             ))}
+             {Object.keys(photoGroups).length === 0 && (
+                 <div className="py-12 text-center text-muted-foreground">
+                    <p>Your photo library is empty.</p>
+                    <p className="text-sm">Use the "Add Photos" button to upload your first photo.</p>
+                  </div>
+            )}
           </Tabs>
         </CardContent>
       </Card>
@@ -508,7 +450,7 @@ export default function PhotosPage() {
   );
 }
 
-function PhotoCard({ photo, category, onDelete, onEdit }: { photo: Photo; category: string; onDelete: (id: string, category: string) => void; onEdit: (photo: Photo) => void; }) {
+function PhotoCard({ photo, onDelete, onEdit }: { photo: Photo; onDelete: (photo: Photo) => void; onEdit: (photo: Photo) => void; }) {
   const { id, src, alt, 'data-ai-hint': dataAiHint } = photo;
   return (
     <Card className="overflow-hidden">
@@ -529,7 +471,7 @@ function PhotoCard({ photo, category, onDelete, onEdit }: { photo: Photo; catego
                 <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete this photo.</AlertDialogDescription></AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => onDelete(id, category)} className={buttonVariants({ variant: 'destructive' })}>Delete</AlertDialogAction>
+                  <AlertDialogAction onClick={() => onDelete(photo)} className={buttonVariants({ variant: 'destructive' })}>Delete</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>

@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   CardContent,
@@ -42,8 +43,9 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 import type { Message } from '@/lib/data';
-import { initialMessages } from '@/lib/data';
+import { getMessages, addMessage, updateMessage, deleteMessage } from '@/lib/message-db';
 
 export default function MessagesPage() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -54,53 +56,64 @@ export default function MessagesPage() {
 
   const [newContent, setNewContent] = useState('');
   const [newSchedule, setNewSchedule] = useState('');
+  
+  const { toast } = useToast();
 
-  // Load from localStorage on mount
-  useEffect(() => {
+  const fetchMessages = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const savedMessages = localStorage.getItem('messages');
-      if (savedMessages) {
-        setMessages(JSON.parse(savedMessages));
-      } else {
-        setMessages(initialMessages);
-      }
+      const dbMessages = await getMessages();
+      setMessages(dbMessages);
     } catch (error) {
-      console.error("Failed to load messages from localStorage", error);
-      setMessages(initialMessages);
+      console.error("Failed to load messages from Firestore", error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Could not load messages. Please check your Firebase configuration.',
+      });
     }
     setIsLoading(false);
-  }, []);
+  }, [toast]);
 
-  // Save to localStorage when messages change
   useEffect(() => {
-    if (!isLoading) {
-      localStorage.setItem('messages', JSON.stringify(messages));
-    }
-  }, [messages, isLoading]);
+    fetchMessages();
+  }, [fetchMessages]);
 
 
-  const handleAddMessage = (e: React.FormEvent) => {
+  const handleAddMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newContent.trim()) {
       return;
     }
 
-    const newMessage: Message = {
-      id: Date.now(),
+    const newMessage: Omit<Message, 'id'> = {
       content: newContent,
       schedule: newSchedule || 'Always Active',
       status: 'Active',
     };
-
-    setMessages((prevMessages) => [...prevMessages, newMessage]);
-
-    setNewContent('');
-    setNewSchedule('');
-    setIsAddDialogOpen(false);
+    
+    try {
+        await addMessage(newMessage);
+        toast({ title: "Success", description: "New message has been added." });
+        setNewContent('');
+        setNewSchedule('');
+        setIsAddDialogOpen(false);
+        fetchMessages(); // Refresh list
+    } catch (error) {
+        console.error("Failed to add message", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not save the new message.' });
+    }
   };
 
-  const handleDeleteMessage = (id: number) => {
-    setMessages((prevMessages) => prevMessages.filter((msg) => msg.id !== id));
+  const handleDeleteMessage = async (id: string) => {
+    try {
+        await deleteMessage(id);
+        toast({ title: "Success", description: "Message has been deleted." });
+        fetchMessages();
+    } catch (error) {
+        console.error("Failed to delete message", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not delete the message.' });
+    }
   };
 
   const handleEditClick = (message: Message) => {
@@ -108,17 +121,20 @@ export default function MessagesPage() {
     setIsEditDialogOpen(true);
   };
 
-  const handleUpdateMessage = (e: React.FormEvent) => {
+  const handleUpdateMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingMessage) return;
 
-    setMessages((prevMessages) =>
-      prevMessages.map((msg) =>
-        msg.id === editingMessage.id ? editingMessage : msg
-      )
-    );
-    setIsEditDialogOpen(false);
-    setEditingMessage(null);
+    try {
+        await updateMessage(editingMessage.id, editingMessage);
+        toast({ title: "Success", description: "Message has been updated." });
+        setIsEditDialogOpen(false);
+        setEditingMessage(null);
+        fetchMessages();
+    } catch (error) {
+        console.error("Failed to update message", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not update the message.' });
+    }
   };
   
   const handleEditDialogChange = (open: boolean) => {
