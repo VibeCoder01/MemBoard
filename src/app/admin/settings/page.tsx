@@ -177,7 +177,7 @@ export default function SettingsPage() {
                 <Switch id="monitorActivity" checked={settings.monitorActivity} onCheckedChange={(checked) => handleSwitchChange('monitorActivity', checked)}/>
             </div>
             <div className="space-y-3">
-                <Label htmlFor="scrollSpeed">Message Scroll Speed</Label>
+                <Label htmlFor="scrollSpeed">Message Scroll Speed ({settings.scrollSpeed}%)</Label>
                 <Slider id="scrollSpeed" value={[settings.scrollSpeed]} onValueChange={(value) => handleSliderChange('scrollSpeed', value)} max={100} step={1} />
             </div>
             <div className="space-y-3">
