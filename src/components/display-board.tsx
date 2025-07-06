@@ -22,12 +22,10 @@ type DisplayItem = {
 
 // Fisher-Yates shuffle algorithm
 const shuffle = <T,>(array: T[]): T[] => {
-  let currentIndex = array.length, randomIndex;
   const newArray = [...array];
-  while (currentIndex !== 0) {
-    randomIndex = Math.floor(Math.random() * currentIndex);
-    currentIndex--;
-    [newArray[currentIndex], newArray[randomIndex]] = [newArray[randomIndex], newArray[currentIndex]];
+  for (let i = newArray.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
   }
   return newArray;
 };
@@ -38,8 +36,9 @@ export function DisplayBoard() {
   const [displayQueue, setDisplayQueue] = useState<DisplayItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load all data from localStorage on mount and build the display queue
+  // Load data and build the display queue
   useEffect(() => {
+    // 1. Load data with fallbacks
     let settings: Settings;
     let messages: Message[];
     let photoGroups: PhotoGroups;
@@ -52,8 +51,7 @@ export function DisplayBoard() {
       messages = savedMessages ? JSON.parse(savedMessages) : initialMessages;
       
       const savedPhotos = localStorage.getItem('photoGroups');
-      photoGroups = (savedPhotos && savedPhotos !== '{}') ? JSON.parse(savedPhotos) : initialPhotoGroups;
-
+      photoGroups = (savedPhotos && Object.keys(JSON.parse(savedPhotos)).length > 0) ? JSON.parse(savedPhotos) : initialPhotoGroups;
     } catch (error) {
       console.error("Failed to load data from localStorage", error);
       settings = defaultSettings;
@@ -61,87 +59,87 @@ export function DisplayBoard() {
       photoGroups = initialPhotoGroups;
     }
     
-    let itemsToDisplay: DisplayItem[] = [];
+    // 2. Assemble content based on settings
+    let contentItems: DisplayItem[] = [];
 
-    // Process and add photos IF enabled
     if (settings.displayPhotos) {
-        let allPhotos: Photo[] = [];
+        let photoList: Photo[] = [];
+        // Flatten all groups into a single list
+        photoList = Object.values(photoGroups).flat();
+        
+        // Handle randomization logic
         if (settings.randomizeAllPhotos) {
-          allPhotos = Object.values(photoGroups).flat();
-          if(settings.randomize || settings.randomizeInPhotoGroups) {
-            allPhotos = shuffle(allPhotos);
-          }
+            photoList = shuffle(photoList);
         } else {
-          const categories = Object.keys(photoGroups);
-          for (const category of categories) {
-            let groupPhotos = photoGroups[category] || [];
-            if (settings.randomizeInPhotoGroups) {
-              groupPhotos = shuffle(groupPhotos);
+            const groupedList: Photo[] = [];
+            const categories = Object.keys(photoGroups);
+            for (const category of categories) {
+                let groupPhotos = photoGroups[category] || [];
+                if (settings.randomizeInPhotoGroups) {
+                    groupPhotos = shuffle(groupPhotos);
+                }
+                groupedList.push(...groupPhotos);
             }
-            allPhotos.push(...groupPhotos);
-          }
+            photoList = groupedList;
         }
         
-        const photoItems: DisplayItem[] = allPhotos
-          .filter(p => p && p.src) // Safeguard against invalid photo data
+        // Create display items only from valid photos
+        const photoItems: DisplayItem[] = photoList
+          .filter(p => p && p.src)
           .map(p => ({
             type: 'photo',
             src: p.src,
             alt: p.alt,
             'data-ai-hint': p['data-ai-hint'],
-            duration: settings.photoDuration * 1000
+            duration: (settings.photoDuration || 10) * 1000
           }));
-        itemsToDisplay.push(...photoItems);
+        contentItems.push(...photoItems);
     }
     
-    // Process and add messages IF enabled
     if (settings.displayMessages) {
         const activeMessages = messages.filter(m => m.status === 'Active');
         const scrollDuration = 60 - (settings.scrollSpeed / 100) * 50; 
         const messageItems: DisplayItem[] = activeMessages.map(m => ({
           type: 'message',
           text: m.content,
-          duration: settings.messageDuration * 1000,
+          duration: (settings.messageDuration || 15) * 1000,
           fontSize: settings.messageFontSize,
           scrollDuration: scrollDuration,
         }));
-        itemsToDisplay.push(...messageItems);
+        contentItems.push(...messageItems);
     }
     
-    // Shuffle if global randomize is on
+    // 3. Shuffle globally if enabled
     if (settings.randomize) {
-      itemsToDisplay = shuffle(itemsToDisplay);
+      contentItems = shuffle(contentItems);
     }
     
-    // Build final queue with blanks interspersed
+    // 4. Build final queue with blank screens
     const finalQueue: DisplayItem[] = [];
-    if (itemsToDisplay.length > 0) {
-      itemsToDisplay.forEach((item, index) => {
+    if (contentItems.length > 0) {
+      contentItems.forEach((item, index) => {
         finalQueue.push(item);
-        // Add blank screen if enabled and not the last item
-        if (settings.useBlankScreens && settings.blankDuration > 0 && index < itemsToDisplay.length - 1) {
-            finalQueue.push({ type: 'blank', duration: settings.blankDuration * 1000 });
+        if (settings.useBlankScreens && settings.blankDuration > 0 && index < contentItems.length - 1) {
+            finalQueue.push({ type: 'blank', duration: (settings.blankDuration || 3) * 1000 });
         }
       });
     }
     
+    // 5. Set state
     setDisplayQueue(finalQueue);
     if (finalQueue.length > 0) {
-        setCurrentItem(finalQueue[0]);
+      setCurrentItem(finalQueue[0]);
     }
     setIsLoading(false);
   }, []);
 
   // Main display loop effect
   useEffect(() => {
-    if (isLoading || displayQueue.length === 0) {
-      return; 
-    }
+    if (isLoading || displayQueue.length === 0) return;
 
     const item = displayQueue[currentIndex];
     setCurrentItem(item);
 
-    // Safeguard against zero or negative duration
     const duration = item && item.duration > 0 ? item.duration : 5000;
 
     const timer = setTimeout(() => {
@@ -153,24 +151,25 @@ export function DisplayBoard() {
 
 
   const renderItem = () => {
-    if(isLoading) {
+    if (isLoading) {
         return <div className="flex h-full w-full items-center justify-center"><p className="text-2xl text-muted-foreground">Initializing MemBoard...</p></div>;
     }
-    if (displayQueue.length === 0) {
-        return <div className="flex h-full w-full items-center justify-center text-center p-8"><p className="text-2xl text-muted-foreground">No content to display. Add photos or "Active" messages in the admin panel.</p></div>;
-    }
-    if (!currentItem) {
-      return null; // Should not happen after loading if queue is not empty, but good practice
+    if (displayQueue.length === 0 || !currentItem) {
+        return <div className="flex h-full w-full items-center justify-center text-center p-8"><p className="text-2xl text-muted-foreground">No content to display. Enable photos or messages in the admin panel.</p></div>;
     }
 
     switch (currentItem.type) {
       case 'photo':
+        // Safeguard against rendering an image without a source
+        if (!currentItem.src) {
+            return <div className="h-full w-full bg-background animate-fade-in" />;
+        }
         return (
           <div className="relative h-full w-full animate-fade-in">
             <Image
               key={currentItem.src}
-              src={currentItem.src!}
-              alt={currentItem.alt!}
+              src={currentItem.src}
+              alt={currentItem.alt || ''}
               fill={true}
               style={{ objectFit: 'cover' }}
               data-ai-hint={currentItem['data-ai-hint']}
@@ -196,7 +195,6 @@ export function DisplayBoard() {
         );
       case 'blank':
       default:
-        // Render a blank screen, which is just the background
         return <div className="h-full w-full bg-background animate-fade-in" />;
     }
   };
