@@ -172,40 +172,42 @@ export function DisplayBoard() {
       photoGroups = initialPhotoGroups;
     }
     
-    // Process photos based on settings
-    let photos: Photo[] = [];
-    if (settings.randomizeAllPhotos) {
-      photos = Object.values(photoGroups).flat();
-      if(settings.randomize || settings.randomizeInPhotoGroups) {
-          photos = shuffle(photos);
-      }
-    } else {
-      const categories = Object.keys(photoGroups);
-      for (const category of categories) {
-        let groupPhotos = photoGroups[category] || [];
-        if (settings.randomizeInPhotoGroups) {
-          groupPhotos = shuffle(groupPhotos);
-        }
-        photos.push(...groupPhotos);
-      }
-    }
+    let itemsToDisplay: DisplayItem[] = [];
 
-    let combinedItems: DisplayItem[] = [];
-
+    // Process and add photos IF enabled
     if (settings.displayPhotos) {
-        const photoItems: DisplayItem[] = photos.map(p => ({
-          type: 'photo',
-          src: p.src,
-          alt: p.alt,
-          'data-ai-hint': p['data-ai-hint'],
-          duration: settings.photoDuration * 1000
-        }));
-        combinedItems.push(...photoItems);
+        let allPhotos: Photo[] = [];
+        if (settings.randomizeAllPhotos) {
+          allPhotos = Object.values(photoGroups).flat();
+          if(settings.randomize || settings.randomizeInPhotoGroups) {
+            allPhotos = shuffle(allPhotos);
+          }
+        } else {
+          const categories = Object.keys(photoGroups);
+          for (const category of categories) {
+            let groupPhotos = photoGroups[category] || [];
+            if (settings.randomizeInPhotoGroups) {
+              groupPhotos = shuffle(groupPhotos);
+            }
+            allPhotos.push(...groupPhotos);
+          }
+        }
+        
+        const photoItems: DisplayItem[] = allPhotos
+          .filter(p => p && p.src) // Safeguard against invalid photo data
+          .map(p => ({
+            type: 'photo',
+            src: p.src,
+            alt: p.alt,
+            'data-ai-hint': p['data-ai-hint'],
+            duration: settings.photoDuration * 1000
+          }));
+        itemsToDisplay.push(...photoItems);
     }
     
+    // Process and add messages IF enabled
     if (settings.displayMessages) {
         const activeMessages = messages.filter(m => m.status === 'Active');
-        // Slower scroll speed = longer duration
         const scrollDuration = 60 - (settings.scrollSpeed / 100) * 50; 
         const messageItems: DisplayItem[] = activeMessages.map(m => ({
           type: 'message',
@@ -214,31 +216,28 @@ export function DisplayBoard() {
           fontSize: settings.messageFontSize,
           scrollDuration: scrollDuration,
         }));
-        combinedItems.push(...messageItems);
+        itemsToDisplay.push(...messageItems);
     }
     
     // Shuffle if global randomize is on
     if (settings.randomize) {
-      combinedItems = shuffle(combinedItems);
+      itemsToDisplay = shuffle(itemsToDisplay);
     }
     
-    // Intersperse blank items
+    // Build final queue with blanks interspersed
     const finalQueue: DisplayItem[] = [];
-    if (combinedItems.length > 0) {
-      combinedItems.forEach((item) => {
+    if (itemsToDisplay.length > 0) {
+      itemsToDisplay.forEach((item, index) => {
         finalQueue.push(item);
-        if (settings.useBlankScreens && settings.blankDuration > 0) {
+        // Add blank screen if enabled and not the last item
+        if (settings.useBlankScreens && settings.blankDuration > 0 && index < itemsToDisplay.length - 1) {
             finalQueue.push({ type: 'blank', duration: settings.blankDuration * 1000 });
         }
       });
-      // Remove the last blank item as it's redundant
-      if (settings.useBlankScreens && settings.blankDuration > 0 && finalQueue.length > 0 && finalQueue[finalQueue.length - 1].type === 'blank') {
-          finalQueue.pop();
-      }
     }
     
     setDisplayQueue(finalQueue);
-    if(finalQueue.length > 0) {
+    if (finalQueue.length > 0) {
         setCurrentItem(finalQueue[0]);
     }
     setIsLoading(false);
@@ -253,7 +252,8 @@ export function DisplayBoard() {
     const item = displayQueue[currentIndex];
     setCurrentItem(item);
 
-    const duration = item.duration > 0 ? item.duration : 5000;
+    // Safeguard against zero or negative duration
+    const duration = item && item.duration > 0 ? item.duration : 5000;
 
     const timer = setTimeout(() => {
       setCurrentIndex((prevIndex) => (prevIndex + 1) % displayQueue.length);
@@ -271,7 +271,7 @@ export function DisplayBoard() {
         return <div className="flex h-full w-full items-center justify-center text-center p-8"><p className="text-2xl text-muted-foreground">No content to display. Add photos or "Active" messages in the admin panel.</p></div>;
     }
     if (!currentItem) {
-        return null;
+      return null; // Should not happen after loading if queue is not empty, but good practice
     }
 
     switch (currentItem.type) {
@@ -307,7 +307,8 @@ export function DisplayBoard() {
         );
       case 'blank':
       default:
-        return null;
+        // Render a blank screen, which is just the background
+        return <div className="h-full w-full bg-background animate-fade-in" />;
     }
   };
 
