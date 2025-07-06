@@ -22,9 +22,23 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const db = getFirestore(app);
-const storage = getStorage(app);
+// Check if all required config values are present.
+// This prevents the app from crashing at build time or if env vars are missing.
+const isConfigured = firebaseConfig.projectId && firebaseConfig.storageBucket;
+
+const app = isConfigured
+  ? getApps().length
+    ? getApp()
+    : initializeApp(firebaseConfig)
+  : null;
+
+const db = app ? getFirestore(app) : null;
+const storage = app ? getStorage(app) : null;
+
+if (!isConfigured) {
+  console.error(
+    'Firebase is not configured. Please create a .env.local file with your Firebase project\'s configuration details. The app will not function correctly until this is done. See src/lib/firebase.ts for details.'
+  );
+}
 
 export { db, storage };
