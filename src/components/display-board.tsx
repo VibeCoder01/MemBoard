@@ -6,7 +6,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import type { Message, Photo, PhotoGroups, Settings } from '@/lib/data';
 import { defaultSettings, initialMessages, initialPhotoGroups } from '@/lib/data';
 
-
 type DisplayItem = {
   type: 'photo' | 'message' | 'blank';
   duration: number;
@@ -32,11 +31,11 @@ const shuffle = <T,>(array: T[]): T[] => {
 
 export function DisplayBoard() {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [currentItem, setCurrentItem] = useState<DisplayItem | null>(null);
   const [displayQueue, setDisplayQueue] = useState<DisplayItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [key, setKey] = useState(0); // To reset animations
 
-  // Load data and build the display queue
+  // Effect to load data and build the queue once on mount
   useEffect(() => {
     // 1. Load data with fallbacks
     let settings: Settings;
@@ -62,12 +61,10 @@ export function DisplayBoard() {
     // 2. Assemble content based on settings
     let contentItems: DisplayItem[] = [];
 
+    // Add photos ONLY if enabled
     if (settings.displayPhotos) {
-        let photoList: Photo[] = [];
-        // Flatten all groups into a single list
-        photoList = Object.values(photoGroups).flat();
-        
-        // Handle randomization logic
+        let photoList: Photo[] = Object.values(photoGroups).flat();
+
         if (settings.randomizeAllPhotos) {
             photoList = shuffle(photoList);
         } else {
@@ -83,7 +80,7 @@ export function DisplayBoard() {
             photoList = groupedList;
         }
         
-        // Create display items only from valid photos
+        // Create display items, filtering for valid photos
         const photoItems: DisplayItem[] = photoList
           .filter(p => p && p.src)
           .map(p => ({
@@ -96,6 +93,7 @@ export function DisplayBoard() {
         contentItems.push(...photoItems);
     }
     
+    // Add messages ONLY if enabled
     if (settings.displayMessages) {
         const activeMessages = messages.filter(m => m.status === 'Active');
         const scrollDuration = 60 - (settings.scrollSpeed / 100) * 50; 
@@ -119,6 +117,7 @@ export function DisplayBoard() {
     if (contentItems.length > 0) {
       contentItems.forEach((item, index) => {
         finalQueue.push(item);
+        // Add a blank screen if enabled, but not after the very last item
         if (settings.useBlankScreens && settings.blankDuration > 0 && index < contentItems.length - 1) {
             finalQueue.push({ type: 'blank', duration: (settings.blankDuration || 3) * 1000 });
         }
@@ -127,62 +126,58 @@ export function DisplayBoard() {
     
     // 5. Set state
     setDisplayQueue(finalQueue);
-    if (finalQueue.length > 0) {
-      setCurrentItem(finalQueue[0]);
-    }
     setIsLoading(false);
   }, []);
 
-  // Main display loop effect
+  // Effect to manage the display timer loop
   useEffect(() => {
+    // Don't start the loop until the queue is ready
     if (isLoading || displayQueue.length === 0) return;
 
-    const item = displayQueue[currentIndex];
-    setCurrentItem(item);
-
-    const duration = item && item.duration > 0 ? item.duration : 5000;
+    // Get the current item's duration, with a fallback
+    const currentItem = displayQueue[currentIndex];
+    const duration = currentItem?.duration > 0 ? currentItem.duration : 5000;
 
     const timer = setTimeout(() => {
+      // Move to the next item
       setCurrentIndex((prevIndex) => (prevIndex + 1) % displayQueue.length);
+      // Reset animation key
+      setKey(k => k + 1);
     }, duration);
 
+    // Cleanup the timer when the component unmounts or dependencies change
     return () => clearTimeout(timer);
   }, [currentIndex, displayQueue, isLoading]);
 
+  const currentItem = displayQueue[currentIndex];
 
   const renderItem = () => {
     if (isLoading) {
         return <div className="flex h-full w-full items-center justify-center"><p className="text-2xl text-muted-foreground">Initializing MemBoard...</p></div>;
     }
-    if (displayQueue.length === 0 || !currentItem) {
+    if (!currentItem) {
         return <div className="flex h-full w-full items-center justify-center text-center p-8"><p className="text-2xl text-muted-foreground">No content to display. Enable photos or messages in the admin panel.</p></div>;
     }
 
     switch (currentItem.type) {
       case 'photo':
-        // Safeguard against rendering an image without a source
-        if (!currentItem.src) {
-            return <div className="h-full w-full bg-background animate-fade-in" />;
-        }
         return (
-          <div className="relative h-full w-full animate-fade-in">
+          <div key={key} className="relative h-full w-full animate-fade-in">
             <Image
-              key={currentItem.src}
-              src={currentItem.src}
+              src={currentItem.src!}
               alt={currentItem.alt || ''}
               fill={true}
               style={{ objectFit: 'cover' }}
               data-ai-hint={currentItem['data-ai-hint']}
-              priority={true}
+              priority={true} // Prioritize loading the visible image
             />
           </div>
         );
       case 'message':
         return (
-          <div className="flex h-full w-full items-center justify-center p-12 bg-background animate-fade-in">
+          <div key={key} className="flex h-full w-full items-center justify-center p-12 bg-background animate-fade-in">
             <div className="relative h-full w-full overflow-hidden">
                <div 
-                key={currentItem.text}
                 className="animate-scroll-up absolute bottom-0 flex h-full flex-col justify-center text-center"
                 style={{ animationDuration: `${currentItem.scrollDuration}s` }}
               >
@@ -195,7 +190,7 @@ export function DisplayBoard() {
         );
       case 'blank':
       default:
-        return <div className="h-full w-full bg-background animate-fade-in" />;
+        return <div key={key} className="h-full w-full bg-background animate-fade-in" />;
     }
   };
 
