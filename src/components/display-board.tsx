@@ -51,6 +51,73 @@ const defaultSettings: Settings = {
   useBlankScreens: true,
 };
 
+const initialMessages: Message[] = [
+  {
+    id: 1,
+    content: 'Welcome to our facility. We are glad to have you.',
+    schedule: 'Always Active',
+    status: 'Active',
+  },
+  {
+    id: 2,
+    content: 'Annual summer picnic this Saturday at 12:00 PM.',
+    schedule: '2024-07-20 to 2024-07-27',
+    status: 'Scheduled',
+  },
+  {
+    id: 3,
+    content: 'Movie night tonight in the common room at 7 PM.',
+    schedule: '2024-07-22',
+    status: 'Expired',
+  },
+];
+
+const initialPhotoGroups = {
+  family: [
+    {
+      id: 1,
+      src: 'https://placehold.co/400x300',
+      alt: 'Family at the beach',
+      'data-ai-hint': 'family beach',
+    },
+    {
+      id: 2,
+      src: 'https://placehold.co/400x300',
+      alt: 'Grandparents smiling',
+      'data-ai-hint': 'old couple',
+    },
+  ],
+  events: [
+    {
+      id: 3,
+      src: 'https://placehold.co/400x300',
+      alt: 'Birthday party',
+      'data-ai-hint': 'birthday party',
+    },
+  ],
+  scenery: [
+    {
+      id: 4,
+      src: 'https://placehold.co/400x300',
+      alt: 'Mountain landscape',
+      'data-ai-hint': 'mountain landscape',
+    },
+    {
+      id: 5,
+      src: 'https://placehold.co/400x300',
+      alt: 'City skyline at night',
+      'data-ai-hint': 'city night',
+    },
+    {
+      id: 6,
+      src: 'https://placehold.co/400x300',
+      alt: 'Forest path',
+      'data-ai-hint': 'forest path',
+    },
+  ],
+};
+
+
 type DisplayItem = {
   type: 'photo' | 'message' | 'blank';
   duration: number;
@@ -93,15 +160,16 @@ export function DisplayBoard() {
       settings = savedSettings ? { ...defaultSettings, ...JSON.parse(savedSettings) } : defaultSettings;
       
       const savedMessages = localStorage.getItem('messages');
-      messages = savedMessages ? JSON.parse(savedMessages) : [];
+      messages = savedMessages ? JSON.parse(savedMessages) : initialMessages;
       
       const savedPhotos = localStorage.getItem('photoGroups');
-      photoGroups = savedPhotos ? JSON.parse(savedPhotos) : {};
+      photoGroups = (savedPhotos && savedPhotos !== '{}') ? JSON.parse(savedPhotos) : initialPhotoGroups;
+
     } catch (error) {
       console.error("Failed to load data from localStorage", error);
       settings = defaultSettings;
-      messages = [];
-      photoGroups = {};
+      messages = initialMessages;
+      photoGroups = initialPhotoGroups;
     }
     
     // Process photos based on settings
