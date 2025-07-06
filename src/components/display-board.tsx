@@ -144,7 +144,7 @@ export function DisplayBoard({
           setDisplayQueue(finalQueue);
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Unknown error';
-            onStatusChange(`Error: Failed to load data. Check Firebase config. ${message}`);
+            onStatusChange(`Error: Failed to load data. ${message}`);
             console.error("Failed to load data from storage", error);
         } finally {
             setIsLoading(false);

@@ -65,11 +65,11 @@ export default function MessagesPage() {
       const dbMessages = await getMessages();
       setMessages(dbMessages);
     } catch (error) {
-      console.error("Failed to load messages from Firestore", error);
+      console.error("Failed to load messages from database", error);
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Could not load messages. Please check your Firebase configuration.',
+        description: 'Could not load messages.' ,
       });
     }
     setIsLoading(false);

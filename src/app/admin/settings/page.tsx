@@ -31,7 +31,7 @@ export default function SettingsPage() {
             const dbSettings = await getSettings();
             setSettings(dbSettings);
         } catch (error) {
-            console.error("Failed to load settings from Firestore", error);
+            console.error("Failed to load settings from database", error);
             toast({
                 variant: 'destructive',
                 title: 'Error',
@@ -64,7 +64,7 @@ export default function SettingsPage() {
         description: 'Your configuration has been updated successfully.',
       });
     } catch (error) {
-      console.error("Failed to save settings to Firestore", error);
+      console.error("Failed to save settings to database", error);
       toast({
         variant: 'destructive',
         title: 'Error',
