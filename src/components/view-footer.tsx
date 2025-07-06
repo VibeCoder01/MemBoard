@@ -22,7 +22,7 @@ export function ViewFooter() {
   }, []);
 
   return (
-    <footer className="flex h-16 shrink-0 items-center justify-between bg-primary/20 px-6 backdrop-blur-sm">
+    <footer className="flex h-16 shrink-0 items-center justify-between bg-primary/20 pl-24 pr-6 backdrop-blur-sm">
       <div className="font-body text-xl text-primary-foreground">
         Status: All systems normal.
       </div>

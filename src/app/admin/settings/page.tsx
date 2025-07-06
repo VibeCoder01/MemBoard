@@ -177,7 +177,7 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-3">
                 <Label htmlFor="messageFontSize">Message Font Size ({settings.messageFontSize}px)</Label>
-                <Slider id="messageFontSize" value={[settings.messageFontSize]} onValueChange={(value) => handleSliderChange('messageFontSize', value)} min={24} max={96} step={1} />
+                <Slider id="messageFontSize" value={[settings.messageFontSize]} onValueChange={(value) => handleSliderChange('messageFontSize', value)} min={24} max={192} step={1} />
             </div>
         </CardContent>
       </Card>
