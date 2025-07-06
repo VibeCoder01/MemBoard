@@ -22,11 +22,11 @@ export function ViewFooter({ statusMessage }: { statusMessage: string }) {
   }, []);
 
   return (
-    <footer className="flex h-16 shrink-0 items-center justify-between bg-primary/20 pl-24 pr-6 backdrop-blur-sm">
-      <div className="font-body text-xl text-primary-foreground truncate" title={statusMessage}>
+    <footer className="flex h-16 shrink-0 items-center justify-between bg-secondary/80 pl-24 pr-6 backdrop-blur-sm">
+      <div className="font-body text-xl text-secondary-foreground truncate" title={statusMessage}>
         {statusMessage}
       </div>
-      <div className="font-body text-xl font-medium text-primary-foreground">
+      <div className="font-body text-xl font-medium text-secondary-foreground">
         {date}
       </div>
     </footer>

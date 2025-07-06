@@ -26,14 +26,14 @@ export function ViewHeader() {
   }, []);
 
   return (
-    <header className="flex h-20 shrink-0 items-center justify-between bg-primary/20 px-6 backdrop-blur-sm">
+    <header className="flex h-20 shrink-0 items-center justify-between bg-secondary/80 px-6 backdrop-blur-sm">
       <div className="flex items-center gap-4">
-        <MountainIcon className="h-8 w-8 text-primary-foreground" />
-        <h1 className="font-headline text-3xl font-bold text-primary-foreground">
+        <MountainIcon className="h-8 w-8 text-secondary-foreground" />
+        <h1 className="font-headline text-3xl font-bold text-secondary-foreground">
           MemBoard
         </h1>
       </div>
-      <div className="font-headline text-4xl font-semibold text-primary-foreground">
+      <div className="font-headline text-4xl font-semibold text-secondary-foreground">
         {time}
       </div>
     </header>
