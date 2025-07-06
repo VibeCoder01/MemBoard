@@ -74,17 +74,20 @@ export default function PhotosPage() {
       }
       
       // De-duplicate photos to fix legacy data issues.
-      const seenIds = new Set<number>();
+      // This is the key part of the fix for existing bad data.
+      const seenIds = new Set<string>();
       const cleanedGroups: PhotoGroups = {};
       for (const category in loadedGroups) {
           if (Array.isArray(loadedGroups[category])) {
             cleanedGroups[category] = [];
             for (const photo of loadedGroups[category]) {
-                if (photo && photo.id && !seenIds.has(photo.id)) {
-                    cleanedGroups[category].push(photo);
-                    seenIds.add(photo.id);
+                const photoId = photo?.id?.toString();
+                if (photoId && !seenIds.has(photoId)) {
+                    // Create a new photo object with the ID as a string to migrate old data.
+                    const cleanedPhoto: Photo = {...photo, id: photoId};
+                    cleanedGroups[category].push(cleanedPhoto);
+                    seenIds.add(photoId);
                 }
-                // If ID is seen or photo is malformed, we just skip it.
             }
           }
       }
@@ -193,7 +196,7 @@ export default function PhotosPage() {
             .substring(0, file.name.lastIndexOf('.'))
             .replace(/[-_]/g, ' ');
           resolve({
-            id: Date.now() + Math.random(), // Robust unique ID
+            id: crypto.randomUUID(), // Robust unique ID generation
             src,
             alt: altText,
             'data-ai-hint': altText
@@ -250,7 +253,7 @@ export default function PhotosPage() {
     }
   };
 
-  const handleDeletePhoto = (id: number) => {
+  const handleDeletePhoto = (id: string) => {
     setPhotoGroups((prev) => {
       const newGroups = { ...prev };
       for (const category in newGroups) {
@@ -794,7 +797,7 @@ function PhotoCard({
   onEdit,
 }: {
   photo: Photo;
-  onDelete: (id: number) => void;
+  onDelete: (id: string) => void;
   onEdit: (photo: Photo) => void;
 }) {
   const { id, src, alt, 'data-ai-hint': dataAiHint } = photo;

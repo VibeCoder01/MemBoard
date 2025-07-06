@@ -7,7 +7,7 @@ export type Message = {
 };
 
 export type Photo = {
-  id: number;
+  id: string;
   src: string;
   alt: string;
   'data-ai-hint': string;
@@ -55,13 +55,13 @@ export const initialMessages: Message[] = [
 export const initialPhotoGroups: PhotoGroups = {
   family: [
     {
-      id: 1,
+      id: '1',
       src: 'https://placehold.co/800x600',
       alt: 'Family at the beach',
       'data-ai-hint': 'family beach',
     },
     {
-      id: 2,
+      id: '2',
       src: 'https://placehold.co/600x800',
       alt: 'Grandparents smiling',
       'data-ai-hint': 'old couple',
@@ -69,7 +69,7 @@ export const initialPhotoGroups: PhotoGroups = {
   ],
   events: [
     {
-      id: 3,
+      id: '3',
       src: 'https://placehold.co/700x500',
       alt: 'Birthday party',
       'data-ai-hint': 'birthday party',
@@ -77,19 +77,19 @@ export const initialPhotoGroups: PhotoGroups = {
   ],
   scenery: [
     {
-      id: 4,
+      id: '4',
       src: 'https://placehold.co/900x600',
       alt: 'Mountain landscape',
       'data-ai-hint': 'mountain landscape',
     },
     {
-      id: 5,
+      id: '5',
       src: 'https://placehold.co/600x900',
       alt: 'City skyline at night',
       'data-ai-hint': 'city night',
     },
     {
-      id: 6,
+      id: '6',
       src: 'https://placehold.co/800x500',
       alt: 'Forest path',
       'data-ai-hint': 'forest path',
