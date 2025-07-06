@@ -7,7 +7,8 @@ const jsonHeaders = { 'Content-Type': 'application/json' };
 export const getPhotoGroups = async (): Promise<PhotoGroups> => {
   const res = await fetch('/api/photos');
   if (!res.ok) {
-    throw new Error('Failed to load photos');
+    console.error('Failed to load photos');
+    return {};
   }
   return res.json();
 };
