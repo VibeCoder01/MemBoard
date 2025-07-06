@@ -16,7 +16,6 @@ type DisplayItem = {
   // Message props
   text?: string;
   fontSize?: number;
-  scrollDuration?: number;
 };
 
 // Fisher-Yates shuffle algorithm
@@ -29,141 +28,181 @@ const shuffle = <T,>(array: T[]): T[] => {
   return newArray;
 };
 
-export function DisplayBoard() {
+export function DisplayBoard({ onStatusChange }: { onStatusChange: (message: string) => void }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentItem, setCurrentItem] = useState<DisplayItem | null>(null);
   const [displayQueue, setDisplayQueue] = useState<DisplayItem[]>([]);
+  const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [isLoading, setIsLoading] = useState(true);
   const [key, setKey] = useState(0); // To reset animations
 
   // Effect to load data and build the queue once
   useEffect(() => {
-    // 1. Load data with fallbacks
-    let settings: Settings;
-    let messages: Message[];
-    let photoGroups: PhotoGroups;
+    let loadedSettings: Settings;
+    let monitorActivity = defaultSettings.monitorActivity;
 
+    if (monitorActivity) {
+      onStatusChange('Initializing: Loading settings...');
+    } else {
+      onStatusChange('All systems normal.');
+    }
+    
     try {
       const savedSettings = localStorage.getItem('displaySettings');
-      settings = savedSettings ? { ...defaultSettings, ...JSON.parse(savedSettings) } : defaultSettings;
+      loadedSettings = savedSettings ? { ...defaultSettings, ...JSON.parse(savedSettings) } : defaultSettings;
+      monitorActivity = loadedSettings.monitorActivity;
+      setSettings(loadedSettings);
+
+      if (monitorActivity) onStatusChange('Initializing: Loading content...');
       
       const savedMessages = localStorage.getItem('messages');
-      messages = savedMessages ? JSON.parse(savedMessages) : initialMessages;
+      const messages: Message[] = savedMessages ? JSON.parse(savedMessages) : initialMessages;
       
       const savedPhotos = localStorage.getItem('photoGroups');
       const parsedPhotos = savedPhotos ? JSON.parse(savedPhotos) : initialPhotoGroups;
-      photoGroups = (parsedPhotos && Object.keys(parsedPhotos).length > 0) ? parsedPhotos : initialPhotoGroups;
+      const photoGroups: PhotoGroups = (parsedPhotos && Object.keys(parsedPhotos).length > 0) ? parsedPhotos : initialPhotoGroups;
 
+      if (monitorActivity) onStatusChange('Initializing: Building display queue...');
+      
+      // 2. Assemble content based on settings
+      let contentItems: DisplayItem[] = [];
+
+      // Add photos ONLY if enabled
+      if (loadedSettings.displayPhotos) {
+          let photoList: Photo[] = Object.values(photoGroups).flat().filter(p => p && p.src);
+
+          if (loadedSettings.randomizeAllPhotos) {
+              photoList = shuffle(photoList);
+          } else {
+              const groupedList: Photo[] = [];
+              const categories = Object.keys(photoGroups);
+              for (const category of categories) {
+                  let groupPhotos = photoGroups[category] || [];
+                  if (loadedSettings.randomizeInPhotoGroups) {
+                      groupPhotos = shuffle(groupPhotos);
+                  }
+                  groupedList.push(...groupPhotos);
+              }
+              photoList = groupedList;
+          }
+          
+          const photoItems: DisplayItem[] = photoList
+            .filter(p => p && p.src)
+            .map(p => ({
+              type: 'photo',
+              src: p.src,
+              alt: p.alt,
+              'data-ai-hint': p['data-ai-hint'],
+              duration: (loadedSettings.photoDuration || 10) * 1000
+            }));
+          contentItems.push(...photoItems);
+      }
+      
+      // Add messages ONLY if enabled
+      if (loadedSettings.displayMessages) {
+          const activeMessages = messages.filter(m => m.status === 'Active');
+          
+          const getMessageDuration = (text: string) => {
+            const baseDuration = (text.split(/\s+/).length * 0.5 + 5) * 1000;
+            const scrollFactor = (150 - loadedSettings.scrollSpeed) / 50; 
+            const animationDistanceFactor = 2; // to ensure it scrolls fully off
+            return baseDuration * scrollFactor * animationDistanceFactor;
+          };
+
+          const messageItems: DisplayItem[] = activeMessages.map(m => {
+              const duration = getMessageDuration(m.content);
+              return {
+                  type: 'message',
+                  text: m.content,
+                  duration: duration,
+                  fontSize: loadedSettings.messageFontSize,
+              };
+          });
+          contentItems.push(...messageItems);
+      }
+      
+      // 3. Shuffle globally if enabled
+      if (loadedSettings.randomize) {
+        contentItems = shuffle(contentItems);
+      }
+      
+      // 4. Build final queue with blank screens
+      const finalQueue: DisplayItem[] = [];
+      if (contentItems.length > 0) {
+        contentItems.forEach((item, index) => {
+          finalQueue.push(item);
+          // Add a blank screen if enabled, but not after the very last item
+          if (loadedSettings.useBlankScreens && loadedSettings.blankDuration > 0 && index < contentItems.length - 1) {
+              finalQueue.push({ type: 'blank', duration: (loadedSettings.blankDuration || 3) * 1000 });
+          }
+        });
+      }
+      
+      if (monitorActivity) {
+        if (finalQueue.length > 0) {
+          onStatusChange(`Initialization complete. ${finalQueue.length} items in queue.`);
+        } else {
+          onStatusChange('Initialization complete. No content to display.');
+        }
+      }
+      
+      setDisplayQueue(finalQueue);
     } catch (error) {
       console.error("Failed to load data from localStorage", error);
-      settings = defaultSettings;
-      messages = initialMessages;
-      photoGroups = initialPhotoGroups;
+      if (monitorActivity) {
+          onStatusChange(`Error: Failed to load data. ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
-    
-    // 2. Assemble content based on settings
-    let contentItems: DisplayItem[] = [];
 
-    // Add photos ONLY if enabled
-    if (settings.displayPhotos) {
-        let photoList: Photo[] = Object.values(photoGroups).flat().filter(p => p && p.src);
-
-        if (settings.randomizeAllPhotos) {
-            photoList = shuffle(photoList);
-        } else {
-            const groupedList: Photo[] = [];
-            const categories = Object.keys(photoGroups);
-            for (const category of categories) {
-                let groupPhotos = photoGroups[category] || [];
-                if (settings.randomizeInPhotoGroups) {
-                    groupPhotos = shuffle(groupPhotos);
-                }
-                groupedList.push(...groupPhotos);
-            }
-            photoList = groupedList;
-        }
-        
-        const photoItems: DisplayItem[] = photoList
-          .filter(p => p && p.src) // extra safety check
-          .map(p => ({
-            type: 'photo',
-            src: p.src,
-            alt: p.alt,
-            'data-ai-hint': p['data-ai-hint'],
-            duration: (settings.photoDuration || 10) * 1000
-          }));
-        contentItems.push(...photoItems);
-    }
-    
-    // Add messages ONLY if enabled
-    if (settings.displayMessages) {
-        const activeMessages = messages.filter(m => m.status === 'Active');
-        
-        // Calculate message duration based on text length and scroll speed
-        const getMessageDuration = (text: string) => {
-            const wordCount = text.split(/\s+/).length;
-            // Slower speed (higher slider value) means longer duration
-            const speedFactor = 150 - settings.scrollSpeed; // e.g., 50 -> 100, 100 -> 50
-            // Animation distance is 1.5x longer, so multiply base duration by 1.5
-            return (wordCount * 0.5 + 5) * 1.5 * (speedFactor / 50) * 1000;
-        };
-
-        const messageItems: DisplayItem[] = activeMessages.map(m => {
-            const duration = getMessageDuration(m.content);
-            return {
-                type: 'message',
-                text: m.content,
-                duration: duration,
-                fontSize: settings.messageFontSize,
-                scrollDuration: duration / 1000,
-            };
-        });
-        contentItems.push(...messageItems);
-    }
-    
-    // 3. Shuffle globally if enabled
-    if (settings.randomize) {
-      contentItems = shuffle(contentItems);
-    }
-    
-    // 4. Build final queue with blank screens
-    const finalQueue: DisplayItem[] = [];
-    if (contentItems.length > 0) {
-      contentItems.forEach((item, index) => {
-        finalQueue.push(item);
-        // Add a blank screen if enabled, but not after the very last item
-        if (settings.useBlankScreens && settings.blankDuration > 0 && index < contentItems.length - 1) {
-            finalQueue.push({ type: 'blank', duration: (settings.blankDuration || 3) * 1000 });
-        }
-      });
-    }
-    
-    // 5. Set state
-    setDisplayQueue(finalQueue);
     setIsLoading(false);
-  }, []);
+  }, [onStatusChange]);
 
   // Effect to manage the display timer loop
   useEffect(() => {
-    if (isLoading || displayQueue.length === 0) {
+    const monitorActivity = settings.monitorActivity;
+
+    if (isLoading) {
+      return;
+    }
+
+    if (displayQueue.length === 0) {
+      if (monitorActivity) onStatusChange('No content to display.');
       setCurrentItem(null);
       return;
     }
     
-    // Set the item to be displayed
     const item = displayQueue[currentIndex];
     setCurrentItem(item);
-    setKey(k => k + 1); // Force re-render for animations
+    setKey(k => k + 1);
     
-    // Duration for the timeout. Ensure it's a positive number.
+    if (monitorActivity) {
+      switch (item.type) {
+        case 'photo':
+          onStatusChange(`Displaying photo: "${item.alt}" for ${item.duration / 1000}s.`);
+          break;
+        case 'message':
+          onStatusChange(`Scrolling message: "${item.text?.substring(0, 40)}..."`);
+          break;
+        case 'blank':
+          onStatusChange(`Displaying blank screen for ${item.duration / 1000}s.`);
+          break;
+        default:
+          onStatusChange('Error: Unknown item type in queue.');
+          break;
+      }
+    } else {
+      onStatusChange('All systems normal.');
+    }
+    
     const duration = item?.duration > 0 ? item.duration : 5000;
 
     const timer = setTimeout(() => {
+      if (monitorActivity) onStatusChange('Waiting for next item...');
       setCurrentIndex((prevIndex) => (prevIndex + 1) % displayQueue.length);
     }, duration);
 
     return () => clearTimeout(timer);
-  }, [currentIndex, displayQueue, isLoading]);
+  }, [currentIndex, displayQueue, isLoading, onStatusChange, settings]);
 
   const renderItem = () => {
     if (isLoading) {
@@ -183,13 +222,15 @@ export function DisplayBoard() {
               fill={true}
               style={{ objectFit: 'cover' }}
               data-ai-hint={currentItem['data-ai-hint']}
-              priority={true} // Prioritize loading the visible image
+              priority={true}
             />
           </div>
         );
       case 'message':
+        const scrollDuration = currentItem.duration / 1000;
         const style = {
-          '--scroll-duration': `${currentItem.scrollDuration}s`,
+          '--scroll-duration': `${scrollDuration}s`,
+           fontSize: `${currentItem.fontSize}px`
         } as React.CSSProperties;
 
         return (
@@ -199,7 +240,7 @@ export function DisplayBoard() {
                 className="animate-scroll-message absolute flex h-full w-full flex-col justify-center text-center"
                 style={style}
               >
-                <p className="font-body leading-normal text-foreground" style={{fontSize: `${currentItem.fontSize}px`}}>
+                <p className="font-body leading-normal text-foreground">
                   {currentItem.text}
                 </p>
               </div>

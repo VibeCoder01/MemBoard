@@ -167,6 +167,15 @@ export default function SettingsPage() {
                 </Label>
                 <Switch id="randomizeInPhotoGroups" checked={settings.randomizeInPhotoGroups} onCheckedChange={(checked) => handleSwitchChange('randomizeInPhotoGroups', checked)} />
             </div>
+            <div className="flex items-center justify-between">
+                <Label htmlFor="monitorActivity" className="flex flex-col space-y-1">
+                    <span>Monitor Activity</span>
+                    <span className="font-normal leading-snug text-muted-foreground">
+                        Show detailed activity status in the view mode footer.
+                    </span>
+                </Label>
+                <Switch id="monitorActivity" checked={settings.monitorActivity} onCheckedChange={(checked) => handleSwitchChange('monitorActivity', checked)}/>
+            </div>
             <div className="space-y-3">
                 <Label htmlFor="scrollSpeed">Message Scroll Speed</Label>
                 <Slider id="scrollSpeed" value={[settings.scrollSpeed]} onValueChange={(value) => handleSliderChange('scrollSpeed', value)} max={100} step={1} />

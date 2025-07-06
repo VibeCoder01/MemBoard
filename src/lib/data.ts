@@ -28,6 +28,7 @@ export type Settings = {
   displayPhotos: boolean;
   displayMessages: boolean;
   useBlankScreens: boolean;
+  monitorActivity: boolean;
 };
 
 export const initialMessages: Message[] = [
@@ -47,7 +48,7 @@ export const initialMessages: Message[] = [
     id: 3,
     content: 'Movie night tonight in the common room at 7 PM.',
     schedule: '2024-07-22',
-    status: 'Expired',
+    status: 'Active',
   },
 ];
 
@@ -108,4 +109,5 @@ export const defaultSettings: Settings = {
   displayPhotos: true,
   displayMessages: true,
   useBlankScreens: true,
+  monitorActivity: false,
 };
