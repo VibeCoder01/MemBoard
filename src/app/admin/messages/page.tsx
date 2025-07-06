@@ -42,34 +42,8 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-
-type Message = {
-  id: number;
-  content: string;
-  schedule: string;
-  status: 'Active' | 'Scheduled' | 'Expired';
-};
-
-const initialMessages: Message[] = [
-  {
-    id: 1,
-    content: 'Welcome to our facility. We are glad to have you.',
-    schedule: 'Always Active',
-    status: 'Active',
-  },
-  {
-    id: 2,
-    content: 'Annual summer picnic this Saturday at 12:00 PM.',
-    schedule: '2024-07-20 to 2024-07-27',
-    status: 'Scheduled',
-  },
-  {
-    id: 3,
-    content: 'Movie night tonight in the common room at 7 PM.',
-    schedule: '2024-07-22',
-    status: 'Expired',
-  },
-];
+import type { Message } from '@/lib/data';
+import { initialMessages } from '@/lib/data';
 
 export default function MessagesPage() {
   const [messages, setMessages] = useState<Message[]>([]);

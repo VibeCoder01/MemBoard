@@ -52,62 +52,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-
-const initialPhotoGroups = {
-  family: [
-    {
-      id: 1,
-      src: 'https://placehold.co/400x300',
-      alt: 'Family at the beach',
-      'data-ai-hint': 'family beach',
-    },
-    {
-      id: 2,
-      src: 'https://placehold.co/400x300',
-      alt: 'Grandparents smiling',
-      'data-ai-hint': 'old couple',
-    },
-  ],
-  events: [
-    {
-      id: 3,
-      src: 'https://placehold.co/400x300',
-      alt: 'Birthday party',
-      'data-ai-hint': 'birthday party',
-    },
-  ],
-  scenery: [
-    {
-      id: 4,
-      src: 'https://placehold.co/400x300',
-      alt: 'Mountain landscape',
-      'data-ai-hint': 'mountain landscape',
-    },
-    {
-      id: 5,
-      src: 'https://placehold.co/400x300',
-      alt: 'City skyline at night',
-      'data-ai-hint': 'city night',
-    },
-    {
-      id: 6,
-      src: 'https://placehold.co/400x300',
-      alt: 'Forest path',
-      'data-ai-hint': 'forest path',
-    },
-  ],
-};
-
-type Photo = {
-  id: number;
-  src: string;
-  alt: string;
-  'data-ai-hint': string;
-};
-
-type PhotoGroups = {
-  [key: string]: Photo[];
-};
+import type { Photo, PhotoGroups } from '@/lib/data';
+import { initialPhotoGroups } from '@/lib/data';
 
 export default function PhotosPage() {
   const { toast } = useToast();

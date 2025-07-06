@@ -14,34 +14,8 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
-
-type Settings = {
-  photoDuration: number;
-  messageDuration: number;
-  blankDuration: number;
-  randomize: boolean;
-  scrollSpeed: number;
-  randomizeAllPhotos: boolean;
-  randomizeInPhotoGroups: boolean;
-  messageFontSize: number;
-  displayPhotos: boolean;
-  displayMessages: boolean;
-  useBlankScreens: boolean;
-};
-
-const defaultSettings: Settings = {
-  photoDuration: 10,
-  messageDuration: 15,
-  blankDuration: 3,
-  randomize: false,
-  scrollSpeed: 50,
-  randomizeAllPhotos: false,
-  randomizeInPhotoGroups: true,
-  messageFontSize: 48,
-  displayPhotos: true,
-  displayMessages: true,
-  useBlankScreens: true,
-};
+import type { Settings } from '@/lib/data';
+import { defaultSettings } from '@/lib/data';
 
 export default function SettingsPage() {
   const { toast } = useToast();

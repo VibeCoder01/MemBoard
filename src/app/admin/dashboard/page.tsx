@@ -12,21 +12,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { ArrowUpRight, MessageSquare, Image as ImageIcon } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-
-// Simplified types for counting purposes.
-type Message = { id: number };
-type Photo = { id: number };
-type PhotoGroups = { [key: string]: Photo[] };
-
-// Default data used if nothing is in localStorage, to match other pages.
-const initialMessages: Message[] = [
-  { id: 1 }, { id: 2 }, { id: 3 },
-];
-const initialPhotoGroups: PhotoGroups = {
-  family: [{ id: 1 }, { id: 2 }],
-  events: [{ id: 3 }],
-  scenery: [{ id: 4 }, { id: 5 }, { id: 6 }],
-};
+import type { PhotoGroups } from '@/lib/data';
+import { initialMessages, initialPhotoGroups } from '@/lib/data';
 
 export default function DashboardPage() {
   const [messageCount, setMessageCount] = useState(0);
