@@ -1,3 +1,7 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import {
   Card,
   CardContent,
@@ -6,10 +10,65 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import Link from 'next/link';
 import { ArrowUpRight, MessageSquare, Image as ImageIcon } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+
+// Simplified types for counting purposes.
+type Message = { id: number };
+type Photo = { id: number };
+type PhotoGroups = { [key: string]: Photo[] };
+
+// Default data used if nothing is in localStorage, to match other pages.
+const initialMessages: Message[] = [
+  { id: 1 }, { id: 2 }, { id: 3 },
+];
+const initialPhotoGroups: PhotoGroups = {
+  family: [{ id: 1 }, { id: 2 }],
+  events: [{ id: 3 }],
+  scenery: [{ id: 4 }, { id: 5 }, { id: 6 }],
+};
 
 export default function DashboardPage() {
+  const [messageCount, setMessageCount] = useState(0);
+  const [photoCount, setPhotoCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    try {
+      // Load and count messages
+      const savedMessages = localStorage.getItem('messages');
+      if (savedMessages) {
+        setMessageCount(JSON.parse(savedMessages).length);
+      } else {
+        setMessageCount(initialMessages.length);
+      }
+
+      // Load and count photos
+      const savedPhotos = localStorage.getItem('photoGroups');
+      if (savedPhotos) {
+        const photoGroups: PhotoGroups = JSON.parse(savedPhotos);
+        const totalPhotos = Object.values(photoGroups).reduce(
+          (acc, group) => acc + (group?.length || 0),
+          0
+        );
+        setPhotoCount(totalPhotos);
+      } else {
+         const totalPhotos = Object.values(initialPhotoGroups).reduce(
+          (acc, group) => acc + (group?.length || 0),
+          0
+        );
+        setPhotoCount(totalPhotos);
+      }
+
+    } catch (error) {
+      console.error("Failed to load dashboard data from localStorage", error);
+      // Fallback to initial counts on error
+      setMessageCount(initialMessages.length);
+      setPhotoCount(Object.values(initialPhotoGroups).flat().length);
+    }
+    setIsLoading(false);
+  }, []);
+
   return (
     <div className="flex-1 space-y-4">
       <div className="flex items-center justify-between space-y-2">
@@ -26,10 +85,11 @@ export default function DashboardPage() {
             <MessageSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
-            <p className="text-xs text-muted-foreground">
-              +2 active this week
-            </p>
+            {isLoading ? (
+                <Skeleton className="h-8 w-1/2" />
+            ) : (
+                <div className="text-2xl font-bold">{messageCount}</div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -38,10 +98,11 @@ export default function DashboardPage() {
             <ImageIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">38</div>
-            <p className="text-xs text-muted-foreground">
-              +5 uploaded this month
-            </p>
+            {isLoading ? (
+                <Skeleton className="h-8 w-1/2" />
+            ) : (
+                <div className="text-2xl font-bold">{photoCount}</div>
+            )}
           </CardContent>
         </Card>
          <Card>
