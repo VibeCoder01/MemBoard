@@ -813,11 +813,18 @@ function PhotoCard({
           data-ai-hint={dataAiHint}
         />
       </div>
-      <CardContent className="p-2 flex items-center justify-between">
-        <p className="text-xs text-muted-foreground truncate">{alt}</p>
+      <CardContent className="p-2 flex items-start justify-between gap-2">
+        <div className="flex-1 overflow-hidden">
+          <p className="text-sm font-medium truncate" title={alt}>
+            {alt}
+          </p>
+          <p className="text-xs text-muted-foreground truncate" title={id}>
+            ID: {id}
+          </p>
+        </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-6 w-6">
+            <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0">
               <MoreVertical className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
