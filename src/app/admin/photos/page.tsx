@@ -163,7 +163,7 @@ export default function PhotosPage() {
 
     const filesArray = Array.from(newPhotoFiles);
 
-    const readFileAsDataURL = (file: File): Promise<Photo> => {
+    const readFileAsDataURL = (file: File, index: number): Promise<Photo> => {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = (event) => {
@@ -172,7 +172,7 @@ export default function PhotosPage() {
             .substring(0, file.name.lastIndexOf('.'))
             .replace(/[-_]/g, ' ');
           resolve({
-            id: Date.now() + Math.random(),
+            id: Date.now() + index,
             src,
             alt: altText,
             'data-ai-hint': altText
@@ -188,7 +188,9 @@ export default function PhotosPage() {
     };
 
     try {
-      const newPhotos = await Promise.all(filesArray.map(readFileAsDataURL));
+      const newPhotos = await Promise.all(
+        filesArray.map((file, index) => readFileAsDataURL(file, index))
+      );
 
       setPhotoGroups((prev) => {
         const newGroups = { ...prev };
