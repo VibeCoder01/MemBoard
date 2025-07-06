@@ -1,10 +1,13 @@
+
 "use client";
 
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import type { Message, Photo, PhotoGroups, Settings } from '@/lib/data';
-import { defaultSettings, initialMessages, initialPhotoGroups } from '@/lib/data';
+import { defaultSettings, initialMessages } from '@/lib/data';
+import { getPhotoGroups } from '@/lib/photo-db';
+
 
 type DisplayItem = {
   type: 'photo' | 'message' | 'blank';
@@ -44,109 +47,109 @@ export function DisplayBoard({
 
   // Effect to load data and build the queue once
   useEffect(() => {
-    try {
-      const savedSettings = localStorage.getItem('displaySettings');
-      const loadedSettings = savedSettings 
-        ? { ...defaultSettings, ...JSON.parse(savedSettings) } 
-        : defaultSettings;
-      setSettings(loadedSettings);
+    const buildQueue = async () => {
+        try {
+          const savedSettings = localStorage.getItem('displaySettings');
+          const loadedSettings = savedSettings 
+            ? { ...defaultSettings, ...JSON.parse(savedSettings) } 
+            : defaultSettings;
+          setSettings(loadedSettings);
 
-      const monitor = loadedSettings.monitorActivity;
-      if (monitor) {
-        onStatusChange('Initializing: Loading content...');
-      }
+          const monitor = loadedSettings.monitorActivity;
+          if (monitor) {
+            onStatusChange('Initializing: Loading content...');
+          }
 
-      const savedMessages = localStorage.getItem('messages');
-      const messages: Message[] = savedMessages ? JSON.parse(savedMessages) : initialMessages;
-      
-      const savedPhotos = localStorage.getItem('photoGroups');
-      const photoGroups: PhotoGroups = savedPhotos && Object.keys(JSON.parse(savedPhotos)).length > 0
-        ? JSON.parse(savedPhotos)
-        : initialPhotoGroups;
-      
-      let contentItems: DisplayItem[] = [];
+          const savedMessages = localStorage.getItem('messages');
+          const messages: Message[] = savedMessages ? JSON.parse(savedMessages) : initialMessages;
+          
+          const photoGroups: PhotoGroups = await getPhotoGroups();
+          
+          let contentItems: DisplayItem[] = [];
 
-      // 1. Add photos if enabled
-      if (loadedSettings.displayPhotos) {
-          let photoList: Photo[] = Object.values(photoGroups).flat().filter(p => p && p.src);
-          if (loadedSettings.randomizeAllPhotos) {
-              photoList = shuffle(photoList);
-          } else {
-              const groupedList: Photo[] = [];
-              const categories = Object.keys(photoGroups);
-              for (const category of categories) {
-                  let groupPhotos = photoGroups[category] || [];
-                  if (loadedSettings.randomizeInPhotoGroups) {
-                      groupPhotos = shuffle(groupPhotos);
+          // 1. Add photos if enabled
+          if (loadedSettings.displayPhotos && Object.keys(photoGroups).length > 0) {
+              let photoList: Photo[] = Object.values(photoGroups).flat().filter(p => p && p.src);
+              if (loadedSettings.randomizeAllPhotos) {
+                  photoList = shuffle(photoList);
+              } else {
+                  const groupedList: Photo[] = [];
+                  const categories = Object.keys(photoGroups);
+                  for (const category of categories) {
+                      let groupPhotos = photoGroups[category] || [];
+                      if (loadedSettings.randomizeInPhotoGroups) {
+                          groupPhotos = shuffle(groupPhotos);
+                      }
+                      groupedList.push(...groupPhotos);
                   }
-                  groupedList.push(...groupPhotos);
+                  photoList = groupedList;
               }
-              photoList = groupedList;
+              const photoItems: DisplayItem[] = photoList
+                .filter(p => p && p.src) // extra safety check
+                .map(p => ({
+                  type: 'photo',
+                  src: p.src,
+                  alt: p.alt,
+                  'data-ai-hint': p['data-ai-hint'],
+                  duration: (loadedSettings.photoDuration || 10) * 1000
+                }));
+              contentItems.push(...photoItems);
           }
-          const photoItems: DisplayItem[] = photoList
-            .filter(p => p && p.src) // extra safety check
-            .map(p => ({
-              type: 'photo',
-              src: p.src,
-              alt: p.alt,
-              'data-ai-hint': p['data-ai-hint'],
-              duration: (loadedSettings.photoDuration || 10) * 1000
-            }));
-          contentItems.push(...photoItems);
-      }
-      
-      // 2. Add messages if enabled
-      if (loadedSettings.displayMessages) {
-          const activeMessages = messages.filter(m => m.status === 'Active');
-          const getMessageDuration = (text: string) => {
-            const baseDuration = (text.split(/\s+/).length * 0.5 + 5) * 1000;
-            const scrollFactor = (150 - loadedSettings.scrollSpeed) / 50; 
-            const animationDistanceFactor = 2; // This ensures it scrolls off screen
-            return baseDuration * scrollFactor * animationDistanceFactor;
-          };
-          const messageItems: DisplayItem[] = activeMessages.map(m => ({
-              type: 'message',
-              text: m.content,
-              duration: getMessageDuration(m.content),
-              fontSize: loadedSettings.messageFontSize,
-          }));
-          contentItems.push(...messageItems);
-      }
-      
-      // 3. Shuffle globally if enabled
-      if (loadedSettings.randomize) {
-        contentItems = shuffle(contentItems);
-      }
-      
-      // 4. Build final queue with blank screens
-      const finalQueue: DisplayItem[] = [];
-      if (contentItems.length > 0) {
-        contentItems.forEach((item, index) => {
-          finalQueue.push(item);
-          if (loadedSettings.useBlankScreens && loadedSettings.blankDuration > 0 && index < contentItems.length - 1) {
-              finalQueue.push({ type: 'blank', duration: (loadedSettings.blankDuration || 3) * 1000 });
+          
+          // 2. Add messages if enabled
+          if (loadedSettings.displayMessages) {
+              const activeMessages = messages.filter(m => m.status === 'Active');
+              const getMessageDuration = (text: string) => {
+                const baseDuration = (text.split(/\s+/).length * 0.5 + 5) * 1000;
+                const scrollFactor = (150 - loadedSettings.scrollSpeed) / 50; 
+                const animationDistanceFactor = 2; // This ensures it scrolls off screen
+                return baseDuration * scrollFactor * animationDistanceFactor;
+              };
+              const messageItems: DisplayItem[] = activeMessages.map(m => ({
+                  type: 'message',
+                  text: m.content,
+                  duration: getMessageDuration(m.content),
+                  fontSize: loadedSettings.messageFontSize,
+              }));
+              contentItems.push(...messageItems);
           }
-        });
-      }
-      
-      if (monitor) {
-        if (finalQueue.length > 0) {
-          onStatusChange(`Initialization complete. ${finalQueue.length} items in queue.`);
-        } else {
-          onStatusChange('Initialization complete. No content to display.');
+          
+          // 3. Shuffle globally if enabled
+          if (loadedSettings.randomize) {
+            contentItems = shuffle(contentItems);
+          }
+          
+          // 4. Build final queue with blank screens
+          const finalQueue: DisplayItem[] = [];
+          if (contentItems.length > 0) {
+            contentItems.forEach((item, index) => {
+              finalQueue.push(item);
+              if (loadedSettings.useBlankScreens && loadedSettings.blankDuration > 0 && index < contentItems.length - 1) {
+                  finalQueue.push({ type: 'blank', duration: (loadedSettings.blankDuration || 3) * 1000 });
+              }
+            });
+          }
+          
+          if (monitor) {
+            if (finalQueue.length > 0) {
+              onStatusChange(`Initialization complete. ${finalQueue.length} items in queue.`);
+            } else {
+              onStatusChange('Initialization complete. No content to display.');
+            }
+          } else if (finalQueue.length === 0) {
+              onStatusChange('No content to display. Enable content in the admin panel.');
+          }
+          
+          setDisplayQueue(finalQueue);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            onStatusChange(`Error: Failed to load data. ${message}`);
+            console.error("Failed to load data from storage", error);
+        } finally {
+            setIsLoading(false);
         }
-      } else if (finalQueue.length === 0) {
-          onStatusChange('No content to display. Enable content in the admin panel.');
-      }
-      
-      setDisplayQueue(finalQueue);
-    } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        onStatusChange(`Error: Failed to load data. ${message}`);
-        console.error("Failed to load data from localStorage", error);
-    } finally {
-        setIsLoading(false);
     }
+    buildQueue();
   }, [onStatusChange]);
 
   // Effect to manage the display timer loop

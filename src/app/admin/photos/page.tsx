@@ -54,6 +54,15 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Photo, PhotoGroups } from '@/lib/data';
 import { initialPhotoGroups } from '@/lib/data';
+import {
+  getPhotoGroups,
+  addPhotos,
+  deletePhoto,
+  updatePhoto,
+  renamePhotoCategory,
+  deletePhotoCategory,
+  migrateFromLocalStorage,
+} from '@/lib/photo-db';
 
 export default function PhotosPage() {
   const { toast } = useToast();
@@ -61,63 +70,37 @@ export default function PhotosPage() {
   const [photoGroups, setPhotoGroups] = useState<PhotoGroups>({});
   const [activeTab, setActiveTab] = useState('');
 
-  // Load from localStorage on component mount, de-duplicate, and migrate ID formats.
+  // Load from IndexedDB on component mount, and run migration
   useEffect(() => {
-    try {
-      const savedGroupsJSON = localStorage.getItem('photoGroups');
-      let loadedGroups: PhotoGroups;
-
-      if (savedGroupsJSON && savedGroupsJSON !== '{}') {
-        loadedGroups = JSON.parse(savedGroupsJSON);
-      } else {
-        loadedGroups = initialPhotoGroups;
-      }
-      
-      // De-duplicate photos and migrate old ID formats for consistency.
-      const seenOriginalIds = new Set<string>();
-      const cleanedGroups: PhotoGroups = {};
-      // Simple regex to check for old numeric or timestamp-based IDs.
-      const isOldIdFormat = (id: string) => /^\d+(\.\d+)?$/.test(id);
-
-      for (const category in loadedGroups) {
-          if (Array.isArray(loadedGroups[category])) {
-            cleanedGroups[category] = [];
-            for (const photo of loadedGroups[category]) {
-                const originalId = photo?.id?.toString();
-
-                // Skip if no ID or if we've already processed this original ID (de-duplication).
-                if (!originalId || seenOriginalIds.has(originalId)) {
-                    continue; 
-                }
-                seenOriginalIds.add(originalId);
-                
-                // If the ID is in the old numeric format, generate a new UUID for it.
-                // Otherwise, keep the existing (already a UUID) ID.
-                const finalId = isOldIdFormat(originalId) 
-                  ? crypto.randomUUID() 
-                  : originalId;
-
-                const cleanedPhoto: Photo = {...photo, id: finalId};
-                cleanedGroups[category].push(cleanedPhoto);
+    const loadPhotos = async () => {
+        setIsLoading(true);
+        try {
+            const migrated = await migrateFromLocalStorage();
+            if (migrated) {
+                toast({ title: 'Photo library updated', description: 'Your photos have been moved to a new, more robust storage system.' });
             }
-          }
-      }
+            const groups = await getPhotoGroups();
 
-      setPhotoGroups(cleanedGroups);
+            // If DB is empty after potential migration, load initial data
+            if (Object.keys(groups).length === 0) {
+              await addPhotos(initialPhotoGroups.family, 'family');
+              await addPhotos(initialPhotoGroups.events, 'events');
+              await addPhotos(initialPhotoGroups.scenery, 'scenery');
+              const initialGroups = await getPhotoGroups();
+              setPhotoGroups(initialGroups);
+            } else {
+              setPhotoGroups(groups);
+            }
+            
+        } catch (error) {
+            console.error('Failed to load photo groups from IndexedDB', error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not load your photo library. Please refresh the page.' });
+        }
+        setIsLoading(false);
+    };
+    loadPhotos();
+  }, [toast]);
 
-    } catch (error) {
-      console.error('Failed to load or clean photo groups from localStorage', error);
-      setPhotoGroups(initialPhotoGroups);
-    }
-    setIsLoading(false);
-  }, []);
-
-  // Save to localStorage whenever photoGroups changes
-  useEffect(() => {
-    if (!isLoading) {
-      localStorage.setItem('photoGroups', JSON.stringify(photoGroups));
-    }
-  }, [photoGroups, isLoading]);
 
   // Keep activeTab in sync with available categories
   useEffect(() => {
@@ -169,30 +152,18 @@ export default function PhotosPage() {
     if (targetCategory === '__NEW__') {
       const trimmedName = newCategoryName.trim();
       if (!trimmedName) {
-        toast({
-          variant: 'destructive',
-          title: 'Invalid Category Name',
-          description: 'New category name cannot be empty.',
-        });
+        toast({ variant: 'destructive', title: 'Invalid Category Name', description: 'New category name cannot be empty.' });
         return;
       }
       if (photoGroups.hasOwnProperty(trimmedName)) {
-        toast({
-          variant: 'destructive',
-          title: 'Category Exists',
-          description: 'A category with this name already exists.',
-        });
+        toast({ variant: 'destructive', title: 'Category Exists', description: 'A category with this name already exists.' });
         return;
       }
       targetCategory = trimmedName;
     }
 
     if (!targetCategory) {
-      toast({
-        variant: 'destructive',
-        title: 'No Category',
-        description: 'Please select or create a category for the photos.',
-      });
+      toast({ variant: 'destructive', title: 'No Category', description: 'Please select or create a category for the photos.' });
       return;
     }
 
@@ -203,18 +174,12 @@ export default function PhotosPage() {
         const reader = new FileReader();
         reader.onload = (event) => {
           const src = event.target?.result as string;
-          const altText = file.name
-            .substring(0, file.name.lastIndexOf('.'))
-            .replace(/[-_]/g, ' ');
+          const altText = file.name.substring(0, file.name.lastIndexOf('.')).replace(/[-_]/g, ' ');
           resolve({
-            id: crypto.randomUUID(), // Robust unique ID generation
+            id: crypto.randomUUID(),
             src,
             alt: altText,
-            'data-ai-hint': altText
-              .toLowerCase()
-              .split(' ')
-              .slice(0, 2)
-              .join(' '),
+            'data-ai-hint': altText.toLowerCase().split(' ').slice(0, 2).join(' '),
           });
         };
         reader.onerror = reject;
@@ -223,55 +188,49 @@ export default function PhotosPage() {
     };
 
     try {
-      const newPhotos = await Promise.all(
-        filesArray.map(file => readFileAsDataURL(file))
-      );
-
+      const newPhotos = await Promise.all(filesArray.map(file => readFileAsDataURL(file)));
+      await addPhotos(newPhotos, targetCategory);
+      
       setPhotoGroups((prev) => {
         const newGroups = { ...prev };
-        if (!newGroups[targetCategory]) {
-          newGroups[targetCategory] = [];
-        }
+        if (!newGroups[targetCategory]) newGroups[targetCategory] = [];
         newGroups[targetCategory].push(...newPhotos);
         return newGroups;
       });
 
-      if (newPhotoCategory === '__NEW__') {
-        setActiveTab(targetCategory);
-      }
+      if (newPhotoCategory === '__NEW__') setActiveTab(targetCategory);
 
-      toast({
-        title: 'Upload Complete',
-        description: `${filesArray.length} photo(s) added to "${targetCategory}".`,
-      });
-
-      // Reset form and close dialog
+      toast({ title: 'Upload Complete', description: `${filesArray.length} photo(s) added to "${targetCategory}".` });
       setNewPhotoFiles(null);
-      const fileInput = document.getElementById(
-        'photo-file'
-      ) as HTMLInputElement;
+      const fileInput = document.getElementById('photo-file') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
       setNewCategoryName('');
       setIsUploadDialogOpen(false);
+
     } catch (error) {
-      console.error('Failed to read files for upload', error);
-      toast({
-        variant: 'destructive',
-        title: 'Upload Failed',
-        description:
-          'There was an error processing the photos. Please try again.',
-      });
+      console.error('Failed to read files or save to DB', error);
+      toast({ variant: 'destructive', title: 'Upload Failed', description: 'There was an error processing or saving the photos.' });
     }
   };
 
-  const handleDeletePhoto = (id: string) => {
-    setPhotoGroups((prev) => {
-      const newGroups = { ...prev };
-      for (const category in newGroups) {
-        newGroups[category] = newGroups[category].filter((p) => p.id !== id);
-      }
-      return newGroups;
-    });
+  const handleDeletePhoto = async (id: string, category: string) => {
+    try {
+        await deletePhoto(id);
+        setPhotoGroups(prev => {
+            const newGroups = { ...prev };
+            newGroups[category] = newGroups[category].filter(p => p.id !== id);
+            if (newGroups[category].length === 0) {
+              delete newGroups[category];
+              const remainingCategories = Object.keys(newGroups);
+              setActiveTab(remainingCategories[0] || '');
+            }
+            return newGroups;
+        });
+        toast({ title: "Success", description: "Photo deleted from the library." });
+    } catch (error) {
+        console.error("Failed to delete photo", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not delete the photo.' });
+    }
   };
 
   const handleEditClick = (photo: Photo) => {
@@ -285,98 +244,76 @@ export default function PhotosPage() {
     setIsEditDialogOpen(true);
   };
 
-  const handleUpdatePhoto = (e: React.FormEvent) => {
+  const handleUpdatePhoto = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingPhoto) return;
 
-    setPhotoGroups((prev) => {
-      const newGroups = JSON.parse(JSON.stringify(prev));
+    try {
+        await updatePhoto(editingPhoto, editingPhotoCategory);
+        const updatedGroups = await getPhotoGroups();
+        setPhotoGroups(updatedGroups);
 
-      for (const category in newGroups) {
-        newGroups[category] = newGroups[category].filter(
-          (p: Photo) => p.id !== editingPhoto.id
-        );
-      }
-
-      if (!newGroups[editingPhotoCategory]) {
-        newGroups[editingPhotoCategory] = [];
-      }
-      newGroups[editingPhotoCategory].push(editingPhoto);
-      return newGroups;
-    });
-
-    setIsEditDialogOpen(false);
-    setEditingPhoto(null);
+        setIsEditDialogOpen(false);
+        setEditingPhoto(null);
+        toast({ title: "Success", description: "Photo details have been updated." });
+    } catch(error) {
+        console.error("Failed to update photo", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not update photo details.' });
+    }
   };
 
   const handleEditDialogChange = (open: boolean) => {
     setIsEditDialogOpen(open);
-    if (!open) {
-      setEditingPhoto(null);
-    }
+    if (!open) setEditingPhoto(null);
   };
 
-  const handleAddCategory = (e: React.FormEvent) => {
+  const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedName = newCategoryInput.trim();
     if (trimmedName && !photoGroups.hasOwnProperty(trimmedName)) {
-      setPhotoGroups((prev) => ({
-        ...prev,
-        [trimmedName]: [],
-      }));
+      setPhotoGroups((prev) => ({ ...prev, [trimmedName]: [] }));
       setActiveTab(trimmedName);
       setNewCategoryInput('');
     } else {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Category name cannot be empty or already exist.',
-      });
+      toast({ variant: 'destructive', title: 'Error', description: 'Category name cannot be empty or already exist.' });
     }
   };
 
-  const handleDeleteCategory = (categoryName: string) => {
+  const handleDeleteCategory = async (categoryName: string) => {
     if (Object.keys(photoGroups).length <= 1) {
-      toast({
-        variant: 'destructive',
-        title: 'Cannot Delete',
-        description: 'You must have at least one category.',
-      });
+      toast({ variant: 'destructive', title: 'Cannot Delete', description: 'You must have at least one category.' });
       return;
     }
-
-    if (activeTab === categoryName) {
-      const remainingCategories = Object.keys(photoGroups).filter(
-        (c) => c !== categoryName
-      );
-      setActiveTab(remainingCategories[0]);
+    
+    try {
+      await deletePhotoCategory(categoryName);
+      if (activeTab === categoryName) {
+        const remainingCategories = Object.keys(photoGroups).filter(c => c !== categoryName);
+        setActiveTab(remainingCategories[0] || '');
+      }
+      setPhotoGroups(prev => {
+          const newGroups = { ...prev };
+          delete newGroups[categoryName];
+          return newGroups;
+      });
+      toast({ title: "Category Deleted", description: `The "${categoryName}" category has been removed.` });
+    } catch (error) {
+      console.error("Failed to delete category", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not delete the category.' });
     }
-
-    setPhotoGroups((prev) => {
-      const newGroups = { ...prev };
-      delete newGroups[categoryName];
-      return newGroups;
-    });
   };
 
   const handleStartRename = (name: string) => {
     setRenamingCategory({ oldName: name, newName: name });
   };
 
-  const handleRenameCategory = () => {
+  const handleRenameCategory = async () => {
     if (!renamingCategory) return;
     const { oldName, newName } = renamingCategory;
     const trimmedNewName = newName.trim();
 
-    if (
-      !trimmedNewName ||
-      (trimmedNewName !== oldName && photoGroups.hasOwnProperty(trimmedNewName))
-    ) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Category name cannot be empty or already exist.',
-      });
+    if (!trimmedNewName || (trimmedNewName !== oldName && photoGroups.hasOwnProperty(trimmedNewName))) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Category name cannot be empty or already exist.' });
       return;
     }
 
@@ -384,33 +321,18 @@ export default function PhotosPage() {
       setRenamingCategory(null);
       return;
     }
-
-    setPhotoGroups((prev) => {
-      const newGroups = { ...prev };
-      const entries = Object.entries(newGroups);
-      const index = entries.findIndex(([key]) => key === oldName);
-      if (index !== -1) {
-          const photos = newGroups[oldName];
-          delete newGroups[oldName];
-          const newEntries = [
-              ...entries.slice(0, index),
-              [trimmedNewName, photos],
-              ...entries.slice(index + 1),
-          ];
-          const reorderedGroups: PhotoGroups = {};
-          for (const [key, value] of newEntries) {
-            reorderedGroups[key] = value;
-          }
-          return reorderedGroups;
-      }
-      return newGroups;
-    });
     
-    if (activeTab === oldName) {
-      setActiveTab(trimmedNewName);
+    try {
+      await renamePhotoCategory(oldName, trimmedNewName);
+      const updatedGroups = await getPhotoGroups();
+      setPhotoGroups(updatedGroups);
+      if (activeTab === oldName) setActiveTab(trimmedNewName);
+      setRenamingCategory(null);
+      toast({ title: "Category Renamed", description: `"${oldName}" is now "${trimmedNewName}".` });
+    } catch (error) {
+      console.error("Failed to rename category", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not rename the category.' });
     }
-
-    setRenamingCategory(null);
   };
 
   if (isLoading) {
@@ -435,7 +357,7 @@ export default function PhotosPage() {
               <Skeleton className="h-10 w-24" />
             </div>
             <div className="py-12 text-center text-muted-foreground">
-              <p>Loading and cleaning photo library...</p>
+              <p>Loading and optimizing photo library...</p>
             </div>
           </CardContent>
         </Card>
@@ -446,41 +368,16 @@ export default function PhotosPage() {
   return (
     <div className="flex-1 space-y-4">
       <div className="flex items-center justify-between space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight font-headline">
-          Photo Management
-        </h1>
+        <h1 className="text-3xl font-bold tracking-tight font-headline">Photo Management</h1>
         <div className="flex items-center gap-2">
-          <Dialog
-            open={isCategoryDialogOpen}
-            onOpenChange={setIsCategoryDialogOpen}
-          >
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <Settings className="mr-2 h-4 w-4" />
-                Manage Categories
-              </Button>
-            </DialogTrigger>
+          <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
+            <DialogTrigger asChild><Button variant="outline"><Settings className="mr-2 h-4 w-4" />Manage Categories</Button></DialogTrigger>
             <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Manage Photo Categories</DialogTitle>
-                <DialogDescription>
-                  Add, rename, or delete your photo categories here.
-                </DialogDescription>
-              </DialogHeader>
+              <DialogHeader><DialogTitle>Manage Photo Categories</DialogTitle><DialogDescription>Add, rename, or delete your photo categories here.</DialogDescription></DialogHeader>
               <form onSubmit={handleAddCategory} className="py-4">
-                <Label
-                  htmlFor="new-category-name"
-                  className="text-sm font-medium"
-                >
-                  Add New Category
-                </Label>
+                <Label htmlFor="new-category-name" className="text-sm font-medium">Add New Category</Label>
                 <div className="flex space-x-2 mt-2">
-                  <Input
-                    id="new-category-name"
-                    value={newCategoryInput}
-                    onChange={(e) => setNewCategoryInput(e.target.value)}
-                    placeholder="e.g., Holidays"
-                  />
+                  <Input id="new-category-name" value={newCategoryInput} onChange={(e) => setNewCategoryInput(e.target.value)} placeholder="e.g., Holidays" />
                   <Button type="submit">Add</Button>
                 </div>
               </form>
@@ -489,87 +386,25 @@ export default function PhotosPage() {
                 <h4 className="text-sm font-medium">Existing Categories</h4>
                 <div className="max-h-60 space-y-2 overflow-y-auto pr-2">
                   {Object.keys(photoGroups).map((category) => (
-                    <div
-                      key={category}
-                      className="flex items-center justify-between rounded-md border p-2"
-                    >
+                    <div key={category} className="flex items-center justify-between rounded-md border p-2">
                       {renamingCategory?.oldName === category ? (
                         <div className="flex w-full items-center gap-2">
-                          <Input
-                            value={renamingCategory.newName}
-                            onChange={(e) =>
-                              setRenamingCategory({
-                                ...renamingCategory,
-                                newName: e.target.value,
-                              })
-                            }
-                            className="h-8"
-                            autoFocus
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    handleRenameCategory();
-                                }
-                            }}
-                          />
-                          <Button size="sm" onClick={handleRenameCategory}>
-                            Save
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setRenamingCategory(null)}
-                          >
-                            Cancel
-                          </Button>
+                          <Input value={renamingCategory.newName} onChange={(e) => setRenamingCategory({ ...renamingCategory, newName: e.target.value })} className="h-8" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleRenameCategory(); } }}/>
+                          <Button size="sm" onClick={handleRenameCategory}>Save</Button>
+                          <Button size="sm" variant="ghost" onClick={() => setRenamingCategory(null)}>Cancel</Button>
                         </div>
                       ) : (
                         <>
                           <span className="text-sm">{category}</span>
                           <div className="flex items-center">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleStartRename(category)}
-                            >
-                              Rename
-                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => handleStartRename(category)}>Rename</Button>
                             <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-destructive hover:text-destructive"
-                                  disabled={
-                                    Object.keys(photoGroups).length <= 1
-                                  }
-                                >
-                                  Delete
-                                </Button>
-                              </AlertDialogTrigger>
+                              <AlertDialogTrigger asChild><Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" disabled={Object.keys(photoGroups).length <= 1}>Delete</Button></AlertDialogTrigger>
                               <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>
-                                    Are you absolutely sure?
-                                  </AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This action will permanently delete the "
-                                    {category}" category and all photos within
-                                    it.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
+                                <AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action will permanently delete the "{category}" category and all photos within it.</AlertDialogDescription></AlertDialogHeader>
                                 <AlertDialogFooter>
                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    className={buttonVariants({
-                                      variant: 'destructive',
-                                    })}
-                                    onClick={() =>
-                                      handleDeleteCategory(category)
-                                    }
-                                  >
-                                    Delete
-                                  </AlertDialogAction>
+                                  <AlertDialogAction className={buttonVariants({ variant: 'destructive' })} onClick={() => handleDeleteCategory(category)}>Delete</AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
                             </AlertDialog>
@@ -580,23 +415,12 @@ export default function PhotosPage() {
                   ))}
                 </div>
               </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setIsCategoryDialogOpen(false)}
-                >
-                  Close
-                </Button>
-              </DialogFooter>
+              <DialogFooter><Button variant="outline" onClick={() => setIsCategoryDialogOpen(false)}>Close</Button></DialogFooter>
             </DialogContent>
           </Dialog>
-
-          <Dialog
-            open={isUploadDialogOpen}
-            onOpenChange={(isOpen) => {
+          <Dialog open={isUploadDialogOpen} onOpenChange={(isOpen) => {
               setIsUploadDialogOpen(isOpen);
               if (isOpen) {
-                // Reset form state when dialog opens
                 const initialCategory = activeTab || Object.keys(photoGroups)[0] || '';
                 setNewPhotoCategory(initialCategory);
                 setNewCategoryName('');
@@ -604,79 +428,28 @@ export default function PhotosPage() {
                 const fileInput = document.getElementById('photo-file') as HTMLInputElement;
                 if (fileInput) fileInput.value = '';
               }
-            }}
-          >
-            <DialogTrigger asChild>
-              <Button>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Add Photos
-              </Button>
-            </DialogTrigger>
+            }}>
+            <DialogTrigger asChild><Button><PlusCircle className="mr-2 h-4 w-4" />Add Photos</Button></DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <form onSubmit={handleUploadPhoto}>
-                <DialogHeader>
-                  <DialogTitle>Add Photos</DialogTitle>
-                  <DialogDescription>
-                    Select one or more photos from your device, choose a
-                    category, and upload.
-                  </DialogDescription>
-                </DialogHeader>
+                <DialogHeader><DialogTitle>Add Photos</DialogTitle><DialogDescription>Select one or more photos from your device, choose a category, and upload.</DialogDescription></DialogHeader>
                 <div className="grid gap-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="photo-file">Photo File(s)</Label>
-                    <Input
-                      id="photo-file"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileChange}
-                      required
-                      multiple
-                    />
-                  </div>
+                  <div className="space-y-2"><Label htmlFor="photo-file">Photo File(s)</Label><Input id="photo-file" type="file" accept="image/*" onChange={handleFileChange} required multiple/></div>
                   <div className="space-y-2">
                     <Label htmlFor="category">Category</Label>
-                    <Select
-                      value={newPhotoCategory}
-                      onValueChange={setNewPhotoCategory}
-                      required
-                    >
-                      <SelectTrigger id="category">
-                        <SelectValue placeholder="Select a category" />
-                      </SelectTrigger>
+                    <Select value={newPhotoCategory} onValueChange={setNewPhotoCategory} required>
+                      <SelectTrigger id="category"><SelectValue placeholder="Select a category" /></SelectTrigger>
                       <SelectContent>
-                        {Object.keys(photoGroups).map((cat) => (
-                          <SelectItem key={cat} value={cat}>
-                            {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                          </SelectItem>
-                        ))}
+                        {Object.keys(photoGroups).map((cat) => (<SelectItem key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</SelectItem>))}
                         <Separator />
-                        <SelectItem value="__NEW__">
-                          -- Create new category --
-                        </SelectItem>
+                        <SelectItem value="__NEW__">-- Create new category --</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                   {newPhotoCategory === '__NEW__' && (
-                    <div className="space-y-2">
-                      <Label htmlFor="new-category-name-upload">New Category Name</Label>
-                      <Input
-                        id="new-category-name-upload"
-                        value={newCategoryName}
-                        onChange={(e) => setNewCategoryName(e.target.value)}
-                        placeholder="e.g., Vacation 2024"
-                        required
-                      />
-                    </div>
-                  )}
+                   {newPhotoCategory === '__NEW__' && (<div className="space-y-2"><Label htmlFor="new-category-name-upload">New Category Name</Label><Input id="new-category-name-upload" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="e.g., Vacation 2024" required/></div>)}
                 </div>
                 <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsUploadDialogOpen(false)}
-                  >
-                    Cancel
-                  </Button>
+                  <Button type="button" variant="outline" onClick={() => setIsUploadDialogOpen(false)}>Cancel</Button>
                   <Button type="submit">Save Photos</Button>
                 </DialogFooter>
               </form>
@@ -684,113 +457,46 @@ export default function PhotosPage() {
           </Dialog>
         </div>
       </div>
-
       <Dialog open={isEditDialogOpen} onOpenChange={handleEditDialogChange}>
         <DialogContent className="sm:max-w-md">
           <form onSubmit={handleUpdatePhoto}>
-            <DialogHeader>
-              <DialogTitle>Edit Photo</DialogTitle>
-              <DialogDescription>Update the photo details.</DialogDescription>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>Edit Photo</DialogTitle><DialogDescription>Update the photo details.</DialogDescription></DialogHeader>
             {editingPhoto && (
               <div className="grid gap-4 py-4">
-                <div className="relative aspect-video w-full">
-                  <Image
-                    src={editingPhoto.src}
-                    alt={editingPhoto.alt}
-                    layout="fill"
-                    objectFit="contain"
-                    className="rounded-md"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-alt-text">Description (Alt Text)</Label>
-                  <Input
-                    id="edit-alt-text"
-                    value={editingPhoto.alt}
-                    onChange={(e) =>
-                      setEditingPhoto({
-                        ...editingPhoto,
-                        alt: e.target.value,
-                      })
-                    }
-                    required
-                  />
-                </div>
+                <div className="relative aspect-video w-full"><Image src={editingPhoto.src} alt={editingPhoto.alt} layout="fill" objectFit="contain" className="rounded-md"/></div>
+                <div className="space-y-2"><Label htmlFor="edit-alt-text">Description (Alt Text)</Label><Input id="edit-alt-text" value={editingPhoto.alt} onChange={(e) => setEditingPhoto({ ...editingPhoto, alt: e.target.value })} required/></div>
                 <div className="space-y-2">
                   <Label htmlFor="edit-category">Category</Label>
-                  <Select
-                    value={editingPhotoCategory}
-                    onValueChange={setEditingPhotoCategory}
-                  >
-                    <SelectTrigger id="edit-category">
-                      <SelectValue placeholder="Select a category" />
-                    </SelectTrigger>
+                  <Select value={editingPhotoCategory} onValueChange={setEditingPhotoCategory}>
+                    <SelectTrigger id="edit-category"><SelectValue placeholder="Select a category" /></SelectTrigger>
                     <SelectContent>
-                      {Object.keys(photoGroups).map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                        </SelectItem>
-                      ))}
+                      {Object.keys(photoGroups).map((cat) => (<SelectItem key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</SelectItem>))}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
             )}
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => handleEditDialogChange(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit">Save Changes</Button>
-            </DialogFooter>
+            <DialogFooter><Button type="button" variant="outline" onClick={() => handleEditDialogChange(false)}>Cancel</Button><Button type="submit">Save Changes</Button></DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
-
       <Card>
-        <CardHeader>
-          <CardTitle>Photo Library</CardTitle>
-          <CardDescription>
-            Upload, organize, and manage the photos displayed on the board.
-          </CardDescription>
-        </CardHeader>
+        <CardHeader><CardTitle>Photo Library</CardTitle><CardDescription>Upload, organize, and manage the photos displayed on the board.</CardDescription></CardHeader>
         <CardContent>
-          <Tabs
-            value={activeTab}
-            onValueChange={setActiveTab}
-            className="w-full"
-          >
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList>
-              {Object.keys(photoGroups).map((category) => (
-                <TabsTrigger key={category} value={category}>
-                  {category.charAt(0).toUpperCase() + category.slice(1)}
-                </TabsTrigger>
-              ))}
+              {Object.keys(photoGroups).map((category) => (<TabsTrigger key={category} value={category}>{category.charAt(0).toUpperCase() + category.slice(1)}</TabsTrigger>))}
             </TabsList>
             {Object.entries(photoGroups).map(([category, photos]) => (
               <TabsContent key={category} value={category} className="mt-4">
                 {photos.length > 0 ? (
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {photos.map((p) => (
-                      <PhotoCard
-                        key={p.id}
-                        photo={p}
-                        onDelete={handleDeletePhoto}
-                        onEdit={handleEditClick}
-                      />
-                    ))}
+                    {photos.map((p) => (<PhotoCard key={p.id} photo={p} category={category} onDelete={handleDeletePhoto} onEdit={handleEditClick}/>))}
                   </div>
                 ) : (
                   <div className="py-12 text-center text-muted-foreground">
                     <p>This category is empty.</p>
-                    <p className="text-sm">
-                      Use the "Add Photos" button to upload photos to this
-                      category.
-                    </p>
+                    <p className="text-sm">Use the "Add Photos" button to upload photos to this category.</p>
                   </div>
                 )}
               </TabsContent>
@@ -802,73 +508,28 @@ export default function PhotosPage() {
   );
 }
 
-function PhotoCard({
-  photo,
-  onDelete,
-  onEdit,
-}: {
-  photo: Photo;
-  onDelete: (id: string) => void;
-  onEdit: (photo: Photo) => void;
-}) {
+function PhotoCard({ photo, category, onDelete, onEdit }: { photo: Photo; category: string; onDelete: (id: string, category: string) => void; onEdit: (photo: Photo) => void; }) {
   const { id, src, alt, 'data-ai-hint': dataAiHint } = photo;
-
   return (
     <Card className="overflow-hidden">
-      <div className="relative aspect-[4/3]">
-        <Image
-          src={src}
-          alt={alt}
-          layout="fill"
-          objectFit="cover"
-          data-ai-hint={dataAiHint}
-        />
-      </div>
+      <div className="relative aspect-[4/3]"><Image src={src} alt={alt} layout="fill" objectFit="cover" data-ai-hint={dataAiHint}/></div>
       <CardContent className="p-2 flex items-start justify-between gap-2">
         <div className="flex-1 overflow-hidden">
-          <p className="text-sm font-medium truncate" title={alt}>
-            {alt}
-          </p>
-          <p className="text-xs text-muted-foreground truncate" title={id}>
-            ID: {id}
-          </p>
+          <p className="text-sm font-medium truncate" title={alt}>{alt}</p>
+          <p className="text-xs text-muted-foreground truncate" title={id}>ID: {id}</p>
         </div>
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0">
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
+          <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onEdit(photo)}>
-              Edit
-            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onEdit(photo)}>Edit</DropdownMenuItem>
             <DropdownMenuSeparator />
             <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <DropdownMenuItem
-                  onSelect={(e) => e.preventDefault()}
-                  className="text-destructive focus:text-destructive"
-                >
-                  Delete
-                </DropdownMenuItem>
-              </AlertDialogTrigger>
+              <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">Delete</DropdownMenuItem></AlertDialogTrigger>
               <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete
-                    this photo.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
+                <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete this photo.</AlertDialogDescription></AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => onDelete(id)}
-                    className={buttonVariants({ variant: 'destructive' })}
-                  >
-                    Delete
-                  </AlertDialogAction>
+                  <AlertDialogAction onClick={() => onDelete(id, category)} className={buttonVariants({ variant: 'destructive' })}>Delete</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>

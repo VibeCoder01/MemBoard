@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -12,8 +13,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { ArrowUpRight, MessageSquare, Image as ImageIcon } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { PhotoGroups } from '@/lib/data';
-import { initialMessages, initialPhotoGroups } from '@/lib/data';
+import { initialMessages } from '@/lib/data';
+import { getPhotoCount } from '@/lib/photo-db';
 
 export default function DashboardPage() {
   const [messageCount, setMessageCount] = useState(0);
@@ -21,39 +22,26 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      // Load and count messages
-      const savedMessages = localStorage.getItem('messages');
-      if (savedMessages) {
-        setMessageCount(JSON.parse(savedMessages).length);
-      } else {
-        setMessageCount(initialMessages.length);
-      }
+    const fetchData = async () => {
+        setIsLoading(true);
+        try {
+          // Load and count messages from localStorage
+          const savedMessages = localStorage.getItem('messages');
+          setMessageCount(savedMessages ? JSON.parse(savedMessages).length : initialMessages.length);
+          
+          // Load and count photos from IndexedDB
+          const count = await getPhotoCount();
+          setPhotoCount(count);
 
-      // Load and count photos
-      const savedPhotos = localStorage.getItem('photoGroups');
-      if (savedPhotos) {
-        const photoGroups: PhotoGroups = JSON.parse(savedPhotos);
-        const totalPhotos = Object.values(photoGroups).reduce(
-          (acc, group) => acc + (group?.length || 0),
-          0
-        );
-        setPhotoCount(totalPhotos);
-      } else {
-         const totalPhotos = Object.values(initialPhotoGroups).reduce(
-          (acc, group) => acc + (group?.length || 0),
-          0
-        );
-        setPhotoCount(totalPhotos);
-      }
-
-    } catch (error) {
-      console.error("Failed to load dashboard data from localStorage", error);
-      // Fallback to initial counts on error
-      setMessageCount(initialMessages.length);
-      setPhotoCount(Object.values(initialPhotoGroups).flat().length);
+        } catch (error) {
+          console.error("Failed to load dashboard data", error);
+          // Fallback to initial counts on error
+          setMessageCount(initialMessages.length);
+          setPhotoCount(0); // Can't access initial photos easily, so fallback to 0
+        }
+        setIsLoading(false);
     }
-    setIsLoading(false);
+    fetchData();
   }, []);
 
   return (
