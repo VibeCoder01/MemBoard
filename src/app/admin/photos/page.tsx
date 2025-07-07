@@ -71,17 +71,15 @@ export default function PhotosPage() {
   const fetchPhotos = useCallback(async () => {
     setIsLoading(true);
     try {
-        const groups = await getPhotoGroups();
-        setPhotoGroups(groups);
-        if (Object.keys(groups).length > 0 && !Object.keys(groups).includes(activeTab)) {
-          setActiveTab(Object.keys(groups)[0]);
-        }
+      const groups = await getPhotoGroups();
+      setPhotoGroups(groups);
     } catch (error) {
-        console.error('Failed to load photo groups from database', error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not load your photo library.' });
+      console.error('Failed to load photo groups from database', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not load your photo library.' });
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
-  }, [toast, activeTab]);
+  }, [toast]);
 
   useEffect(() => {
     fetchPhotos();
@@ -89,12 +87,14 @@ export default function PhotosPage() {
 
   useEffect(() => {
     const categories = Object.keys(photoGroups);
-    if (categories.length > 0 && !categories.includes(activeTab)) {
-      setActiveTab(categories[0]);
-    } else if (categories.length === 0) {
+    if (categories.length > 0) {
+      setActiveTab((current) =>
+        categories.includes(current) ? current : categories[0]
+      );
+    } else {
       setActiveTab('');
     }
-  }, [photoGroups, activeTab]);
+  }, [photoGroups]);
 
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
