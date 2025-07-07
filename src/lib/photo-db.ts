@@ -22,7 +22,12 @@ export const getPhotoCount = async (): Promise<number> => {
   return data.count as number;
 };
 
-export const addPhotos = async (files: File[], group: string): Promise<Photo[]> => {
+export type AddPhotosResponse = {
+  inserted: Photo[];
+  duplicates: string[];
+};
+
+export const addPhotos = async (files: File[], group: string): Promise<AddPhotosResponse> => {
   const formData = new FormData();
   files.forEach((f) => formData.append('files', f));
   formData.append('group', group);

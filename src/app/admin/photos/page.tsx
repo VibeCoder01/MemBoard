@@ -152,9 +152,12 @@ export default function PhotosPage() {
     const filesArray = Array.from(newPhotoFiles);
 
     try {
-      await addPhotos(filesArray, targetCategory);
+      const { inserted, duplicates } = await addPhotos(filesArray, targetCategory);
 
-      toast({ title: 'Upload Complete', description: `${filesArray.length} photo(s) added to "${targetCategory}".` });
+      const message = `${inserted.length} photo(s) added to "${targetCategory}".` +
+        (duplicates.length > 0 ? ` ${duplicates.length} duplicate file(s) were skipped.` : '');
+
+      toast({ title: 'Upload Complete', description: message });
       setNewPhotoFiles(null);
       const fileInput = document.getElementById('photo-file') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
