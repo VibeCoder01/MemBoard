@@ -14,6 +14,13 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { Settings } from '@/lib/data';
 import { defaultSettings } from '@/lib/data';
@@ -54,6 +61,10 @@ export default function SettingsPage() {
 
   const handleSliderChange = (id: keyof Settings, value: number[]) => {
     setSettings((prev) => ({ ...prev, [id]: value[0] }));
+  };
+
+  const handleSelectChange = (id: keyof Settings, value: string) => {
+    setSettings((prev) => ({ ...prev, [id]: Number(value) }));
   };
 
   const handleSaveChanges = async () => {
@@ -190,6 +201,50 @@ export default function SettingsPage() {
             <div className="space-y-3">
                 <Label htmlFor="messageFontSize">Message Font Size ({settings.messageFontSize}px)</Label>
                 <Slider id="messageFontSize" value={[settings.messageFontSize]} onValueChange={(value) => handleSliderChange('messageFontSize', value)} min={24} max={250} step={1} disabled={isDisabled}/>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="morningStartHour">Morning Starts</Label>
+                <Select value={String(settings.morningStartHour)} onValueChange={(val) => handleSelectChange('morningStartHour', val)}>
+                    <SelectTrigger id="morningStartHour"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                        {Array.from({ length: 24 }, (_, i) => (
+                            <SelectItem key={i} value={String(i)}>{`${i}:00`}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="afternoonStartHour">Afternoon Starts</Label>
+                <Select value={String(settings.afternoonStartHour)} onValueChange={(val) => handleSelectChange('afternoonStartHour', val)}>
+                    <SelectTrigger id="afternoonStartHour"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                        {Array.from({ length: 24 }, (_, i) => (
+                            <SelectItem key={i} value={String(i)}>{`${i}:00`}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="eveningStartHour">Evening Starts</Label>
+                <Select value={String(settings.eveningStartHour)} onValueChange={(val) => handleSelectChange('eveningStartHour', val)}>
+                    <SelectTrigger id="eveningStartHour"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                        {Array.from({ length: 24 }, (_, i) => (
+                            <SelectItem key={i} value={String(i)}>{`${i}:00`}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="nightStartHour">Night Starts</Label>
+                <Select value={String(settings.nightStartHour)} onValueChange={(val) => handleSelectChange('nightStartHour', val)}>
+                    <SelectTrigger id="nightStartHour"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                        {Array.from({ length: 24 }, (_, i) => (
+                            <SelectItem key={i} value={String(i)}>{`${i}:00`}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
             </div>
         </CardContent>
       </Card>

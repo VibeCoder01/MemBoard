@@ -32,6 +32,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -47,6 +54,8 @@ import { useToast } from '@/hooks/use-toast';
 import type { Message } from '@/lib/data';
 import { getMessages, addMessage, updateMessage, deleteMessage } from '@/lib/message-db';
 
+const scheduleOptions = ['Always Active', 'Morning', 'Afternoon', 'Evening', 'Night'];
+
 export default function MessagesPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,7 +64,7 @@ export default function MessagesPage() {
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
 
   const [newContent, setNewContent] = useState('');
-  const [newSchedule, setNewSchedule] = useState('');
+  const [newSchedule, setNewSchedule] = useState('Always Active');
   
   const { toast } = useToast();
 
@@ -203,13 +212,19 @@ export default function MessagesPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="schedule">Schedule (Optional)</Label>
-                  <Input
-                    id="schedule"
-                    value={newSchedule}
-                    onChange={(e) => setNewSchedule(e.target.value)}
-                    placeholder="e.g., Always Active, or 2024-08-15"
-                  />
+                  <Label htmlFor="schedule">Schedule</Label>
+                  <Select value={newSchedule} onValueChange={setNewSchedule}>
+                    <SelectTrigger id="schedule">
+                      <SelectValue placeholder="Select schedule" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {scheduleOptions.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <DialogFooter>
@@ -249,18 +264,24 @@ export default function MessagesPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="edit-schedule">Schedule (Optional)</Label>
-                  <Input
-                    id="edit-schedule"
+                  <Label htmlFor="edit-schedule">Schedule</Label>
+                  <Select
                     value={editingMessage.schedule}
-                    onChange={(e) =>
-                      setEditingMessage({
-                        ...editingMessage,
-                        schedule: e.target.value,
-                      })
+                    onValueChange={(value) =>
+                      setEditingMessage({ ...editingMessage, schedule: value })
                     }
-                    placeholder="e.g., Always Active, or 2024-08-15"
-                  />
+                  >
+                    <SelectTrigger id="edit-schedule">
+                      <SelectValue placeholder="Select schedule" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {scheduleOptions.map((opt) => (
+                        <SelectItem key={opt} value={opt}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             )}

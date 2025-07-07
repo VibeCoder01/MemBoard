@@ -30,6 +30,10 @@ export type Settings = {
   displayMessages: boolean;
   useBlankScreens: boolean;
   monitorActivity: boolean;
+  morningStartHour: number;
+  afternoonStartHour: number;
+  eveningStartHour: number;
+  nightStartHour: number;
 };
 
 export const defaultSettings: Settings = {
@@ -44,4 +48,8 @@ export const defaultSettings: Settings = {
   displayMessages: true,
   useBlankScreens: true,
   monitorActivity: false,
+  morningStartHour: 6,
+  afternoonStartHour: 12,
+  eveningStartHour: 18,
+  nightStartHour: 22,
 };
