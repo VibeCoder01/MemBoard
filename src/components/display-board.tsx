@@ -33,6 +33,29 @@ const shuffle = <T,>(array: T[]): T[] => {
   return newArray;
 };
 
+const isNowBetween = (start: number, end: number, hour: number) => {
+  if (start <= end) {
+    return hour >= start && hour < end;
+  }
+  return hour >= start || hour < end;
+};
+
+const isMessageScheduled = (msg: Message, settings: Settings) => {
+  const hour = new Date().getHours();
+  switch (msg.schedule) {
+    case 'Morning':
+      return isNowBetween(settings.morningStartHour, settings.afternoonStartHour, hour);
+    case 'Afternoon':
+      return isNowBetween(settings.afternoonStartHour, settings.eveningStartHour, hour);
+    case 'Evening':
+      return isNowBetween(settings.eveningStartHour, settings.nightStartHour, hour);
+    case 'Night':
+      return isNowBetween(settings.nightStartHour, settings.morningStartHour, hour);
+    default:
+      return true;
+  }
+};
+
 export function DisplayBoard({ 
   onStatusChange,
   onBlankScreenChange,
@@ -99,7 +122,9 @@ export function DisplayBoard({
           
           // 2. Add messages if enabled
           if (loadedSettings.displayMessages) {
-              const activeMessages = messages.filter(m => m.status === 'Active');
+              const activeMessages = messages.filter(
+                (m) => m.status === 'Active' && isMessageScheduled(m, loadedSettings)
+              );
               const getMessageDuration = (text: string) => {
                 const baseDuration = (text.split(/\s+/).length * 0.5 + 5) * 1000;
                 const scrollFactor = (150 - loadedSettings.scrollSpeed) / 50; 
