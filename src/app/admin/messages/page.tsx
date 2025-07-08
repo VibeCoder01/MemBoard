@@ -53,6 +53,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import type { Message } from '@/lib/data';
 import { getMessages, addMessage, updateMessage, deleteMessage } from '@/lib/message-db';
+import { triggerViewRefresh } from '@/lib/utils';
 
 const scheduleOptions = ['Always Active', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
@@ -108,6 +109,7 @@ export default function MessagesPage() {
         setNewSchedule('');
         setIsAddDialogOpen(false);
         fetchMessages(); // Refresh list
+        triggerViewRefresh();
     } catch (error) {
         console.error("Failed to add message", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not save the new message.' });
@@ -119,6 +121,7 @@ export default function MessagesPage() {
         await deleteMessage(id);
         toast({ title: "Success", description: "Message has been deleted." });
         fetchMessages();
+        triggerViewRefresh();
     } catch (error) {
         console.error("Failed to delete message", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not delete the message.' });
@@ -140,6 +143,7 @@ export default function MessagesPage() {
         setIsEditDialogOpen(false);
         setEditingMessage(null);
         fetchMessages();
+        triggerViewRefresh();
     } catch (error) {
         console.error("Failed to update message", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not update the message.' });
