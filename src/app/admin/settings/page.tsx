@@ -25,6 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Settings } from '@/lib/data';
 import { defaultSettings } from '@/lib/data';
 import { getSettings, saveSettings } from '@/lib/settings-db';
+import { triggerViewRefresh } from '@/lib/utils';
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -88,8 +89,8 @@ export default function SettingsPage() {
       await saveSettings(settings);
       try {
         localStorage.setItem('memboard-theme', settings.theme);
-        localStorage.setItem('memboard-settings-updated', Date.now().toString());
       } catch {}
+      triggerViewRefresh();
       toast({
         title: 'Settings Saved',
         description: 'Your configuration has been updated successfully.',
@@ -110,6 +111,7 @@ export default function SettingsPage() {
     try {
       localStorage.setItem('memboard-theme', defaultSettings.theme);
     } catch {}
+    triggerViewRefresh();
     toast({
         title: 'Settings Reset',
         description: 'Settings have been reset to their default values. Click "Save Changes" to apply.',

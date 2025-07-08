@@ -63,6 +63,7 @@ import {
   renamePhotoCategory,
   deletePhotoCategory,
 } from '@/lib/photo-db';
+import { triggerViewRefresh } from '@/lib/utils';
 
 export default function PhotosPage() {
   const { toast } = useToast();
@@ -169,6 +170,7 @@ export default function PhotosPage() {
       setNewCategoryName('');
       setIsUploadDialogOpen(false);
       fetchPhotos();
+      triggerViewRefresh();
       if (newPhotoCategory === '__NEW__') setActiveTab(targetCategory);
 
     } catch (error) {
@@ -182,6 +184,7 @@ export default function PhotosPage() {
         await deletePhoto(photo);
         toast({ title: "Success", description: "Photo deleted from the library." });
         fetchPhotos();
+        triggerViewRefresh();
     } catch (error) {
         console.error("Failed to delete photo", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not delete the photo.' });
@@ -209,6 +212,7 @@ export default function PhotosPage() {
         setEditingPhoto(null);
         toast({ title: "Success", description: "Photo details have been updated." });
         fetchPhotos();
+        triggerViewRefresh();
     } catch(error) {
         console.error("Failed to update photo", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not update photo details.' });
@@ -242,6 +246,7 @@ export default function PhotosPage() {
       await deletePhotoCategory(categoryName);
       toast({ title: "Category Deleted", description: `The "${categoryName}" category has been removed.` });
       fetchPhotos();
+      triggerViewRefresh();
     } catch (error) {
       console.error("Failed to delete category", error);
       toast({ variant: 'destructive', title: 'Error', description: 'Could not delete the category.' });
@@ -272,6 +277,7 @@ export default function PhotosPage() {
       setRenamingCategory(null);
       toast({ title: "Category Renamed", description: `"${oldName}" is now "${trimmedNewName}".` });
       fetchPhotos();
+      triggerViewRefresh();
       setActiveTab(trimmedNewName);
     } catch (error) {
       console.error("Failed to rename category", error);
@@ -286,6 +292,7 @@ export default function PhotosPage() {
       const data = await res.json();
       toast({ title: 'Duplicates Removed', description: `${data.removed} duplicate(s) deleted.` });
       fetchPhotos();
+      triggerViewRefresh();
     } catch (error) {
       console.error('Failed to remove duplicates', error);
       toast({ variant: 'destructive', title: 'Error', description: 'Could not remove duplicate photos.' });
@@ -310,6 +317,7 @@ export default function PhotosPage() {
       setSelectedIds(new Set());
       setSelectionMode(false);
       fetchPhotos();
+      triggerViewRefresh();
     } catch (error) {
       console.error('Failed to delete selected photos', error);
       toast({ variant: 'destructive', title: 'Error', description: 'Could not delete selected photos.' });
