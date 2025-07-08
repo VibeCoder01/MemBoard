@@ -274,6 +274,19 @@ export default function PhotosPage() {
     }
   };
 
+  const handleRemoveDuplicates = async () => {
+    try {
+      const res = await fetch('/api/photos/remove-duplicates', { method: 'POST' });
+      if (!res.ok) throw new Error('Failed');
+      const data = await res.json();
+      toast({ title: 'Duplicates Removed', description: `${data.removed} duplicate(s) deleted.` });
+      fetchPhotos();
+    } catch (error) {
+      console.error('Failed to remove duplicates', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not remove duplicate photos.' });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex-1 space-y-4">
@@ -394,6 +407,7 @@ export default function PhotosPage() {
               </form>
             </DialogContent>
           </Dialog>
+          <Button variant="outline" onClick={handleRemoveDuplicates}>Remove Duplicates</Button>
         </div>
       </div>
       <Dialog open={isEditDialogOpen} onOpenChange={handleEditDialogChange}>
