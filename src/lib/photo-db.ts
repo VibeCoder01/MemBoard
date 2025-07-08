@@ -42,6 +42,14 @@ export const deletePhoto = async (photo: Photo): Promise<void> => {
   await fetch(`/api/photos/${photo.id}`, { method: 'DELETE' });
 };
 
+export const deletePhotos = async (ids: string[]): Promise<void> => {
+  await fetch('/api/photos/bulk-delete', {
+    method: 'POST',
+    headers: jsonHeaders,
+    body: JSON.stringify({ ids }),
+  });
+};
+
 export const updatePhoto = async (id: string, newGroup: string, photoData: Partial<Photo>): Promise<void> => {
   const res = await fetch(`/api/photos/${id}`, {
     method: 'PUT',

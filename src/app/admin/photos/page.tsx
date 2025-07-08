@@ -52,11 +52,13 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
 import type { Photo, PhotoGroups } from '@/lib/data';
 import {
   getPhotoGroups,
   addPhotos,
   deletePhoto,
+  deletePhotos,
   updatePhoto,
   renamePhotoCategory,
   deletePhotoCategory,
@@ -112,6 +114,9 @@ export default function PhotosPage() {
     oldName: string;
     newName: string;
   } | null>(null);
+
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -287,6 +292,30 @@ export default function PhotosPage() {
     }
   };
 
+  const toggleSelectPhoto = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const handleDeleteSelected = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    try {
+      await deletePhotos(ids);
+      toast({ title: 'Photos Deleted', description: `${ids.length} photo(s) removed.` });
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+      fetchPhotos();
+    } catch (error) {
+      console.error('Failed to delete selected photos', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not delete selected photos.' });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex-1 space-y-4">
@@ -408,6 +437,23 @@ export default function PhotosPage() {
             </DialogContent>
           </Dialog>
           <Button variant="outline" onClick={handleRemoveDuplicates}>Remove Duplicates</Button>
+          {!selectionMode && (
+            <Button variant="outline" onClick={() => setSelectionMode(true)}>Select Photos</Button>
+          )}
+          {selectionMode && (
+            <>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteSelected}
+                disabled={selectedIds.size === 0}
+              >
+                Delete Selected
+              </Button>
+              <Button variant="outline" onClick={() => { setSelectionMode(false); setSelectedIds(new Set()); }}>
+                Cancel
+              </Button>
+            </>
+          )}
         </div>
       </div>
       <Dialog open={isEditDialogOpen} onOpenChange={handleEditDialogChange}>
@@ -444,7 +490,17 @@ export default function PhotosPage() {
               <TabsContent key={category} value={category} className="mt-4">
                 {photos.length > 0 ? (
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {photos.map((p) => (<PhotoCard key={p.id} photo={p} onDelete={handleDeletePhoto} onEdit={handleEditClick}/>))}
+                    {photos.map((p) => (
+                      <PhotoCard
+                        key={p.id}
+                        photo={p}
+                        onDelete={handleDeletePhoto}
+                        onEdit={handleEditClick}
+                        selectionMode={selectionMode}
+                        checked={selectedIds.has(p.id)}
+                        onCheckedChange={(checked) => toggleSelectPhoto(p.id, checked as boolean)}
+                      />
+                    ))}
                   </div>
                 ) : (
                   <div className="py-12 text-center text-muted-foreground">
@@ -467,33 +523,68 @@ export default function PhotosPage() {
   );
 }
 
-function PhotoCard({ photo, onDelete, onEdit }: { photo: Photo; onDelete: (photo: Photo) => void; onEdit: (photo: Photo) => void; }) {
+type PhotoCardProps = {
+  photo: Photo;
+  onDelete: (photo: Photo) => void;
+  onEdit: (photo: Photo) => void;
+  selectionMode: boolean;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+};
+
+function PhotoCard({ photo, onDelete, onEdit, selectionMode, checked, onCheckedChange }: PhotoCardProps) {
   const { id, src, alt, 'data-ai-hint': dataAiHint } = photo;
   return (
-    <Card className="overflow-hidden">
-      <div className="relative aspect-[4/3]"><Image src={src} alt={alt} layout="fill" objectFit="cover" data-ai-hint={dataAiHint}/></div>
+    <Card className="overflow-hidden relative">
+      {selectionMode && (
+        <Checkbox
+          checked={checked}
+          onCheckedChange={(v) => onCheckedChange(Boolean(v))}
+          className="absolute left-2 top-2 z-10 bg-background"
+        />
+      )}
+      <div className="relative aspect-[4/3]">
+        <Image src={src} alt={alt} layout="fill" objectFit="cover" data-ai-hint={dataAiHint} />
+      </div>
       <CardContent className="p-2 flex items-start justify-between gap-2">
         <div className="flex-1 overflow-hidden">
           <p className="text-sm font-medium truncate" title={alt}>{alt}</p>
           <p className="text-xs text-muted-foreground truncate" title={id}>ID: {id}</p>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onEdit(photo)}>Edit</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <AlertDialog>
-              <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">Delete</DropdownMenuItem></AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete this photo.</AlertDialogDescription></AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => onDelete(photo)} className={buttonVariants({ variant: 'destructive' })}>Delete</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {!selectionMode && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onEdit(photo)}>Edit</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                    Delete
+                  </DropdownMenuItem>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete this photo.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => onDelete(photo)} className={buttonVariants({ variant: 'destructive' })}>
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </CardContent>
     </Card>
   );
