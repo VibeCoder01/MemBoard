@@ -33,6 +33,25 @@ const shuffle = <T,>(array: T[]): T[] => {
   return newArray;
 };
 
+const getZoomEasing = (curve: Settings['photoZoomCurve']): string => {
+  switch (curve) {
+    case 'linear':
+      return 'linear';
+    case 'cubic':
+      return 'cubic-bezier(0.33, 0, 0.67, 1)';
+    case 'sigmoid':
+      return 'cubic-bezier(0.45, 0, 0.55, 1)';
+    case 'quadratic':
+      return 'cubic-bezier(0.5, 0, 1, 1)';
+    case 'exponential':
+      return 'cubic-bezier(0.7, 0, 1, 1)';
+    case 'logarithmic':
+      return 'cubic-bezier(0, 0, 0.3, 1)';
+    default:
+      return 'linear';
+  }
+};
+
 const isNowBetween = (start: number, end: number, hour: number) => {
   if (start <= end) {
     return hour >= start && hour < end;
@@ -266,6 +285,7 @@ export function DisplayBoard({
                 ? settings.photoZoomDuration
                 : currentItem.duration / 1000
             }s`,
+            '--zoom-easing': getZoomEasing(settings.photoZoomCurve),
           } as React.CSSProperties;
         }
         return (

@@ -70,7 +70,10 @@ export default function SettingsPage() {
   const handleSelectChange = (id: keyof Settings, value: string) => {
     setSettings((prev) => ({
       ...prev,
-      [id]: id === 'photoDisplayMode' || id === 'theme' ? value : Number(value),
+      [id]:
+        id === 'photoDisplayMode' || id === 'theme' || id === 'photoZoomCurve'
+          ? value
+          : Number(value),
     }));
     if (id === 'theme') {
       document.documentElement.classList.toggle('dark', value === 'dark');
@@ -251,6 +254,20 @@ export default function SettingsPage() {
                 <Label htmlFor="photoZoomDuration">Photo Zoom Duration (seconds)</Label>
                 <Input id="photoZoomDuration" type="number" value={settings.photoZoomDuration} onChange={handleInputChange} disabled={isDisabled}/>
                 <p className="text-sm text-muted-foreground">Use 0 to match the photo display time.</p>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="photoZoomCurve">Photo Zoom Curve</Label>
+                <Select value={settings.photoZoomCurve} onValueChange={(val) => handleSelectChange('photoZoomCurve', val)}>
+                    <SelectTrigger id="photoZoomCurve"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="linear">Linear</SelectItem>
+                        <SelectItem value="cubic">Cubic</SelectItem>
+                        <SelectItem value="sigmoid">Sigmoid</SelectItem>
+                        <SelectItem value="quadratic">Quadratic</SelectItem>
+                        <SelectItem value="exponential">Exponential</SelectItem>
+                        <SelectItem value="logarithmic">Logarithmic</SelectItem>
+                    </SelectContent>
+                </Select>
             </div>
             <div className="space-y-2">
                 <Label htmlFor="morningStartHour">Morning Starts</Label>

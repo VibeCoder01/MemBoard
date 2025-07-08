@@ -96,7 +96,8 @@ export default {
         'accordion-up': 'accordion-up 0.2s ease-out',
         "fade-in": "fade-in 1s ease-in-out",
         "scroll-message": "scroll-message var(--scroll-duration, 30s) linear forwards",
-        "zoom-in": "zoom-in var(--zoom-duration, 10s) linear forwards",
+        "zoom-in":
+          "zoom-in var(--zoom-duration, 10s) var(--zoom-easing, linear) forwards",
       },
     },
   },
