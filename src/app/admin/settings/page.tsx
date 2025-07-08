@@ -243,6 +243,15 @@ export default function SettingsPage() {
                     </SelectContent>
                 </Select>
             </div>
+            <div className="space-y-3">
+                <Label htmlFor="photoZoomPercent">Photo Zoom Amount ({settings.photoZoomPercent}%)</Label>
+                <Slider id="photoZoomPercent" value={[settings.photoZoomPercent]} onValueChange={(value) => handleSliderChange('photoZoomPercent', value)} max={50} step={1} disabled={isDisabled}/>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="photoZoomDuration">Photo Zoom Duration (seconds)</Label>
+                <Input id="photoZoomDuration" type="number" value={settings.photoZoomDuration} onChange={handleInputChange} disabled={isDisabled}/>
+                <p className="text-sm text-muted-foreground">Use 0 to match the photo display time.</p>
+            </div>
             <div className="space-y-2">
                 <Label htmlFor="morningStartHour">Morning Starts</Label>
                 <Select value={String(settings.morningStartHour)} onValueChange={(val) => handleSelectChange('morningStartHour', val)}>
