@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { run, all, get } from '@/lib/sqlite';
 import type { Photo } from '@/lib/data';
+import crypto from 'crypto';
 
 interface StoredPhoto extends Photo { group: string }
 
@@ -30,19 +31,20 @@ export async function POST(request: NextRequest) {
   const duplicates: string[] = [];
 
   for (const file of files) {
-    const existing = await get<{ id: string }>('SELECT id FROM photos WHERE storage_path = ?', [file.name]);
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const hash = crypto.createHash('sha256').update(buffer).digest('hex');
+    const existing = await get<{ id: string }>('SELECT id FROM photos WHERE hash = ?', [hash]);
     if (existing) {
       duplicates.push(file.name);
       continue;
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
     const id = crypto.randomUUID();
     const base64 = `data:${file.type};base64,${buffer.toString('base64')}`;
     const hint = file.name.substring(0, file.name.lastIndexOf('.')).replace(/[-_]/g, ' ');
     await run(
-      'INSERT INTO photos (id, src, alt, data_ai_hint, storage_path, group_name, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [id, base64, hint, hint.split(' ').slice(0,2).join(' '), file.name, group, Date.now()]
+      'INSERT INTO photos (id, src, alt, data_ai_hint, storage_path, hash, group_name, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, base64, hint, hint.split(' ').slice(0,2).join(' '), file.name, hash, group, Date.now()]
     );
     inserted.push({ id, src: base64, alt: hint, 'data-ai-hint': hint.split(' ').slice(0,2).join(' '), storagePath: file.name });
   }

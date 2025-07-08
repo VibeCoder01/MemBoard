@@ -26,9 +26,17 @@ function getDatabase(): Promise<sqlite3.Database> {
           alt TEXT NOT NULL,
           data_ai_hint TEXT,
           storage_path TEXT,
+          hash TEXT,
           group_name TEXT,
           createdAt INTEGER
         );`);
+        database.all('PRAGMA table_info(photos);', (err, rows) => {
+          if (err) return;
+          const hasHash = rows.some((r: any) => r.name === 'hash');
+          if (!hasHash) {
+            database.run('ALTER TABLE photos ADD COLUMN hash TEXT;');
+          }
+        });
         database.run(`CREATE TABLE IF NOT EXISTS settings (
           id INTEGER PRIMARY KEY CHECK (id = 1),
           data TEXT NOT NULL
