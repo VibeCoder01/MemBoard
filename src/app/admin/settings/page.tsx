@@ -88,6 +88,7 @@ export default function SettingsPage() {
       await saveSettings(settings);
       try {
         localStorage.setItem('memboard-theme', settings.theme);
+        localStorage.setItem('memboard-settings-updated', Date.now().toString());
       } catch {}
       toast({
         title: 'Settings Saved',
