@@ -369,13 +369,14 @@ export function DisplayBoard({
             } else {
               zoomScale = 1;
             }
-            zoomDuration = Math.max(currentItem.duration / 1000 - 1, 0);
+            zoomDuration = Math.max(currentItem.duration / 1000 - 2, 0);
           } else {
             zoomScale = 1 + settings.photoZoomPercent / 100;
-            zoomDuration =
+            const baseDuration =
               settings.photoZoomDuration > 0
                 ? settings.photoZoomDuration
                 : currentItem.duration / 1000;
+            zoomDuration = Math.max(baseDuration - 2, 0);
           }
           style = {
             ...style,
