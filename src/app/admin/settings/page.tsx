@@ -64,7 +64,10 @@ export default function SettingsPage() {
   };
 
   const handleSelectChange = (id: keyof Settings, value: string) => {
-    setSettings((prev) => ({ ...prev, [id]: Number(value) }));
+    setSettings((prev) => ({
+      ...prev,
+      [id]: id === 'photoDisplayMode' ? value : Number(value),
+    }));
   };
 
   const handleSaveChanges = async () => {
@@ -201,6 +204,17 @@ export default function SettingsPage() {
             <div className="space-y-3">
                 <Label htmlFor="messageFontSize">Message Font Size ({settings.messageFontSize}px)</Label>
                 <Slider id="messageFontSize" value={[settings.messageFontSize]} onValueChange={(value) => handleSliderChange('messageFontSize', value)} min={24} max={250} step={1} disabled={isDisabled}/>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="photoDisplayMode">Photo Display Mode</Label>
+                <Select value={settings.photoDisplayMode} onValueChange={(val) => handleSelectChange('photoDisplayMode', val)}>
+                    <SelectTrigger id="photoDisplayMode"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="maxWidthCrop">Max Width (Crop Vertical)</SelectItem>
+                        <SelectItem value="maxHeightCrop">Max Height (Crop Horizontal)</SelectItem>
+                        <SelectItem value="noCrop">No Cropping</SelectItem>
+                    </SelectContent>
+                </Select>
             </div>
             <div className="space-y-2">
                 <Label htmlFor="morningStartHour">Morning Starts</Label>

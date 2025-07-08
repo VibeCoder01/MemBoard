@@ -1,7 +1,6 @@
 
 "use client";
 
-import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import type { Message, Photo, PhotoGroups, Settings } from '@/lib/data';
@@ -233,16 +232,31 @@ export function DisplayBoard({
 
     switch (currentItem.type) {
       case 'photo':
+        let style: React.CSSProperties = {};
+        let imgProps: Record<string, any> = {
+          src: currentItem.src!,
+          alt: currentItem.alt || '',
+          'data-ai-hint': currentItem['data-ai-hint'],
+        };
+        switch (settings.photoDisplayMode) {
+          case 'maxWidthCrop':
+            style = { width: '100%', height: 'auto', objectFit: 'cover' };
+            break;
+          case 'maxHeightCrop':
+            style = { width: 'auto', height: '100%', objectFit: 'cover' };
+            break;
+          case 'noCrop':
+          default:
+            style = { width: '100%', height: '100%', objectFit: 'contain' };
+            break;
+        }
         return (
-          <div key={key} className="relative h-full w-full animate-fade-in">
-            <Image
-              src={currentItem.src!}
-              alt={currentItem.alt || ''}
-              fill={true}
-              style={{ objectFit: 'cover' }}
-              data-ai-hint={currentItem['data-ai-hint']}
-              priority={true}
-            />
+          <div
+            key={key}
+            className="relative flex h-full w-full items-center justify-center overflow-hidden animate-fade-in"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img {...imgProps} style={style} />
           </div>
         );
       case 'message':
