@@ -253,9 +253,14 @@ export function DisplayBoard({
             break;
         }
         if (settings.photoZoomPercent > 0) {
+          const zoomScale =
+            settings.photoDisplayMode === 'maxWidthCrop' ||
+            settings.photoDisplayMode === 'maxHeightCrop'
+              ? 1 - settings.photoZoomPercent / 100
+              : 1 + settings.photoZoomPercent / 100;
           style = {
             ...style,
-            '--zoom-scale': 1 + settings.photoZoomPercent / 100,
+            '--zoom-scale': zoomScale,
             '--zoom-duration': `${
               settings.photoZoomDuration > 0
                 ? settings.photoZoomDuration
