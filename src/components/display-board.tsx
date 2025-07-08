@@ -8,6 +8,7 @@ import { defaultSettings } from '@/lib/data';
 import { getPhotoGroups } from '@/lib/photo-db';
 import { getMessages } from '@/lib/message-db';
 import { getSettings } from '@/lib/settings-db';
+import { cn } from '@/lib/utils';
 
 
 type DisplayItem = {
@@ -251,13 +252,28 @@ export function DisplayBoard({
             style = { width: '100%', height: '100%', objectFit: 'contain' };
             break;
         }
+        if (settings.photoZoomPercent > 0) {
+          style = {
+            ...style,
+            '--zoom-scale': 1 + settings.photoZoomPercent / 100,
+            '--zoom-duration': `${
+              settings.photoZoomDuration > 0
+                ? settings.photoZoomDuration
+                : currentItem.duration / 1000
+            }s`,
+          } as React.CSSProperties;
+        }
         return (
           <div
             key={key}
             className="relative flex h-full w-full items-center justify-center overflow-hidden animate-fade-in"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img {...imgProps} style={style} />
+            <img
+              {...imgProps}
+              style={style}
+              className={cn(settings.photoZoomPercent > 0 ? 'animate-zoom-in' : '')}
+            />
           </div>
         );
       case 'message':

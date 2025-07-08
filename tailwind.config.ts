@@ -86,12 +86,17 @@ export default {
           "from": { transform: "translateY(100%)" },
           "to": { transform: "translateY(-200%)" },
         },
+        "zoom-in": {
+          "from": { transform: "scale(1)" },
+          "to": { transform: "scale(var(--zoom-scale))" },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
         "fade-in": "fade-in 1s ease-in-out",
         "scroll-message": "scroll-message var(--scroll-duration, 30s) linear forwards",
+        "zoom-in": "zoom-in var(--zoom-duration, 10s) linear forwards",
       },
     },
   },
