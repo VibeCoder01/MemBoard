@@ -269,6 +269,18 @@ export default function SettingsPage() {
                     </SelectContent>
                 </Select>
             </div>
+            <div className="space-y-3">
+                <Label htmlFor="photoZoomCurveMultiplier">Curve Multiplier ({settings.photoZoomCurveMultiplier}x)</Label>
+                <Slider
+                    id="photoZoomCurveMultiplier"
+                    value={[settings.photoZoomCurveMultiplier]}
+                    onValueChange={(value) => handleSliderChange('photoZoomCurveMultiplier', value)}
+                    min={0.5}
+                    max={3}
+                    step={0.1}
+                    disabled={isDisabled}
+                />
+            </div>
             <div className="space-y-2">
                 <Label htmlFor="morningStartHour">Morning Starts</Label>
                 <Select value={String(settings.morningStartHour)} onValueChange={(val) => handleSelectChange('morningStartHour', val)}>

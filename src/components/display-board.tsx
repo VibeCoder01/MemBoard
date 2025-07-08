@@ -33,20 +33,26 @@ const shuffle = <T,>(array: T[]): T[] => {
   return newArray;
 };
 
-const getZoomEasing = (curve: Settings['photoZoomCurve']): string => {
+const clamp = (n: number, min = 0, max = 1) => Math.min(Math.max(n, min), max);
+
+const getZoomEasing = (
+  curve: Settings['photoZoomCurve'],
+  multiplier: number
+): string => {
+  const m = multiplier || 1;
   switch (curve) {
     case 'linear':
       return 'linear';
     case 'cubic':
-      return 'cubic-bezier(0.33, 0, 0.67, 1)';
+      return `cubic-bezier(${clamp(0.33 * m)}, 0, ${clamp(0.67 * m)}, 1)`;
     case 'sigmoid':
-      return 'cubic-bezier(0.45, 0, 0.55, 1)';
+      return `cubic-bezier(${clamp(0.45 * m)}, 0, ${clamp(0.55 * m)}, 1)`;
     case 'quadratic':
-      return 'cubic-bezier(0.5, 0, 1, 1)';
+      return `cubic-bezier(${clamp(0.5 * m)}, 0, ${clamp(1 * m)}, 1)`;
     case 'exponential':
-      return 'cubic-bezier(0.7, 0, 1, 1)';
+      return `cubic-bezier(${clamp(0.7 * m)}, 0, 1, 1)`;
     case 'logarithmic':
-      return 'cubic-bezier(0, 0, 0.3, 1)';
+      return `cubic-bezier(0, 0, ${clamp(0.3 * m)}, 1)`;
     default:
       return 'linear';
   }
@@ -285,7 +291,10 @@ export function DisplayBoard({
                 ? settings.photoZoomDuration
                 : currentItem.duration / 1000
             }s`,
-            '--zoom-easing': getZoomEasing(settings.photoZoomCurve),
+            '--zoom-easing': getZoomEasing(
+              settings.photoZoomCurve,
+              settings.photoZoomCurveMultiplier
+            ),
           } as React.CSSProperties;
         }
         return (

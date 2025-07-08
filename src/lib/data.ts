@@ -40,6 +40,7 @@ export type Settings = {
     | 'quadratic'
     | 'exponential'
     | 'logarithmic';
+  photoZoomCurveMultiplier: number;
   morningStartHour: number;
   afternoonStartHour: number;
   eveningStartHour: number;
@@ -63,6 +64,7 @@ export const defaultSettings: Settings = {
   photoZoomPercent: 0,
   photoZoomDuration: 0,
   photoZoomCurve: 'linear',
+  photoZoomCurveMultiplier: 1,
   morningStartHour: 6,
   afternoonStartHour: 12,
   eveningStartHour: 18,
