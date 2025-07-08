@@ -23,6 +23,6 @@ This example uses SQLite for storage instead of Firebase.
 
 To explore the code, start with `src/app/page.tsx`.
 
-When uploading photos through the admin interface, files that share the exact
-filename with an existing photo are skipped. A toast message shows how many
-photos were added and how many duplicates were ignored.
+When uploading photos through the admin interface, files with identical content
+are skipped (duplicates are detected using a SHA-256 hash). A toast message
+shows how many photos were added and how many duplicates were ignored.
