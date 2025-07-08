@@ -42,6 +42,8 @@ const getZoomEasing = (
 ): string => {
   const m = multiplier || 1;
   switch (curve) {
+    case "none":
+      return "linear";
     case "linear":
       return "linear";
     case "cubic":
@@ -346,38 +348,39 @@ export function DisplayBoard({
             style = { width: "100%", height: "100%", objectFit: "contain" };
             break;
         }
-        if (settings.photoZoomPercent > 0) {
-          let zoomScale: number | undefined;
-          let zoomDuration: number;
-          if (
-            settings.photoDisplayMode === "maxWidthCrop" ||
-            settings.photoDisplayMode === "maxHeightCrop"
-          ) {
-            if (containerRef.current && naturalSize) {
-              const cw = containerRef.current.clientWidth;
-              const ch = containerRef.current.clientHeight;
-              const iw = naturalSize.width;
-              const ih = naturalSize.height;
-              const containerAR = cw / ch;
-              const imageAR = iw / ih;
-              zoomScale = Math.min(
-                1,
+        if (settings.photoZoomCurve !== "none") {
+          let zoomScale = 1;
+          if (containerRef.current && naturalSize) {
+            const cw = containerRef.current.clientWidth;
+            const ch = containerRef.current.clientHeight;
+            const iw = naturalSize.width;
+            const ih = naturalSize.height;
+            const containerAR = cw / ch;
+            const imageAR = iw / ih;
+            if (
+              settings.photoDisplayMode === "maxWidthCrop" ||
+              settings.photoDisplayMode === "maxHeightCrop"
+            ) {
+              const ratio =
                 settings.photoDisplayMode === "maxWidthCrop"
                   ? imageAR / containerAR
-                  : containerAR / imageAR,
-              );
+                  : containerAR / imageAR;
+              if (Math.abs(ratio - 1) < 0.001) {
+                zoomScale =
+                  containerAR > imageAR
+                    ? containerAR / imageAR
+                    : imageAR / containerAR;
+              } else {
+                zoomScale = ratio > 1 ? 1 / ratio : ratio;
+              }
             } else {
-              zoomScale = 1;
+              zoomScale =
+                containerAR > imageAR
+                  ? containerAR / imageAR
+                  : imageAR / containerAR;
             }
-            zoomDuration = Math.max(currentItem.duration / 1000 - 2, 0);
-          } else {
-            zoomScale = 1 + settings.photoZoomPercent / 100;
-            const baseDuration =
-              settings.photoZoomDuration > 0
-                ? settings.photoZoomDuration
-                : currentItem.duration / 1000;
-            zoomDuration = Math.max(baseDuration - 2, 0);
           }
+          const zoomDuration = Math.max(currentItem.duration / 1000 - 2, 0);
           style = {
             ...style,
             "--zoom-scale": zoomScale,
@@ -405,7 +408,7 @@ export function DisplayBoard({
               }
               style={style}
               className={cn(
-                settings.photoZoomPercent > 0 ? "animate-zoom-in" : "",
+                settings.photoZoomCurve !== "none" ? "animate-zoom-in" : "",
               )}
             />
           </div>
