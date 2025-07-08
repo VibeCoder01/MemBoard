@@ -348,11 +348,11 @@ export function DisplayBoard({
         }
         if (settings.photoZoomPercent > 0) {
           let zoomScale: number | undefined;
+          let zoomDuration: number;
           if (
             settings.photoDisplayMode === "maxWidthCrop" ||
             settings.photoDisplayMode === "maxHeightCrop"
           ) {
-            const baseScale = 1 - settings.photoZoomPercent / 100;
             if (containerRef.current && naturalSize) {
               const cw = containerRef.current.clientWidth;
               const ch = containerRef.current.clientHeight;
@@ -360,27 +360,27 @@ export function DisplayBoard({
               const ih = naturalSize.height;
               const containerAR = cw / ch;
               const imageAR = iw / ih;
-              const minScale = Math.min(
+              zoomScale = Math.min(
                 1,
                 settings.photoDisplayMode === "maxWidthCrop"
                   ? imageAR / containerAR
                   : containerAR / imageAR,
               );
-              zoomScale = Math.max(baseScale, minScale);
             } else {
               zoomScale = 1;
             }
+            zoomDuration = Math.max(currentItem.duration / 1000 - 1, 0);
           } else {
             zoomScale = 1 + settings.photoZoomPercent / 100;
+            zoomDuration =
+              settings.photoZoomDuration > 0
+                ? settings.photoZoomDuration
+                : currentItem.duration / 1000;
           }
           style = {
             ...style,
             "--zoom-scale": zoomScale,
-            "--zoom-duration": `${
-              settings.photoZoomDuration > 0
-                ? settings.photoZoomDuration
-                : currentItem.duration / 1000
-            }s`,
+            "--zoom-duration": `${zoomDuration}s`,
             "--zoom-easing": getZoomEasing(
               settings.photoZoomCurve,
               settings.photoZoomCurveMultiplier,
