@@ -31,9 +31,8 @@ export type Settings = {
   useBlankScreens: boolean;
   monitorActivity: boolean;
   photoDisplayMode: 'maxWidthCrop' | 'maxHeightCrop' | 'noCrop';
-  photoZoomPercent: number;
-  photoZoomDuration: number;
   photoZoomCurve:
+    | 'none'
     | 'linear'
     | 'cubic'
     | 'sigmoid'
@@ -61,9 +60,7 @@ export const defaultSettings: Settings = {
   useBlankScreens: true,
   monitorActivity: false,
   photoDisplayMode: 'maxWidthCrop',
-  photoZoomPercent: 0,
-  photoZoomDuration: 0,
-  photoZoomCurve: 'linear',
+  photoZoomCurve: 'none',
   photoZoomCurveMultiplier: 1,
   morningStartHour: 6,
   afternoonStartHour: 12,
