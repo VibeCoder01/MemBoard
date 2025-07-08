@@ -35,6 +35,7 @@ export type Settings = {
   afternoonStartHour: number;
   eveningStartHour: number;
   nightStartHour: number;
+  theme: 'light' | 'dark';
 };
 
 export const defaultSettings: Settings = {
@@ -54,4 +55,5 @@ export const defaultSettings: Settings = {
   afternoonStartHour: 12,
   eveningStartHour: 18,
   nightStartHour: 22,
+  theme: 'light',
 };

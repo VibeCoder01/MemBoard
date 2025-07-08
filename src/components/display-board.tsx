@@ -82,6 +82,7 @@ export function DisplayBoard({
           ]);
 
           setSettings(loadedSettings);
+          document.documentElement.classList.toggle('dark', loadedSettings.theme === 'dark');
 
           const monitor = loadedSettings.monitorActivity;
           if (monitor) {
