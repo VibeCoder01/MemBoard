@@ -276,7 +276,7 @@ export default function SettingsPage() {
                     value={[settings.photoZoomCurveMultiplier]}
                     onValueChange={(value) => handleSliderChange('photoZoomCurveMultiplier', value)}
                     min={0.5}
-                    max={3}
+                    max={5}
                     step={0.1}
                     disabled={isDisabled}
                 />
