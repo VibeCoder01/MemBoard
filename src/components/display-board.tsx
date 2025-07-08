@@ -348,38 +348,30 @@ export function DisplayBoard({
             style = { width: "100%", height: "100%", objectFit: "contain" };
             break;
         }
-        if (settings.photoZoomCurve !== "none") {
-          let zoomScale = 1;
-          if (containerRef.current && naturalSize) {
-            const cw = containerRef.current.clientWidth;
-            const ch = containerRef.current.clientHeight;
-            const iw = naturalSize.width;
-            const ih = naturalSize.height;
-            const containerAR = cw / ch;
-            const imageAR = iw / ih;
-            if (
-              settings.photoDisplayMode === "maxWidthCrop" ||
-              settings.photoDisplayMode === "maxHeightCrop"
-            ) {
-              const ratio =
-                settings.photoDisplayMode === "maxWidthCrop"
-                  ? imageAR / containerAR
-                  : containerAR / imageAR;
-              if (Math.abs(ratio - 1) < 0.001) {
-                zoomScale =
-                  containerAR > imageAR
-                    ? containerAR / imageAR
-                    : imageAR / containerAR;
-              } else {
-                zoomScale = ratio > 1 ? 1 / ratio : ratio;
+          if (settings.photoZoomCurve !== "none") {
+            let zoomScale = 1;
+            if (containerRef.current && naturalSize) {
+              const cw = containerRef.current.clientWidth;
+              const ch = containerRef.current.clientHeight;
+              const iw = naturalSize.width;
+              const ih = naturalSize.height;
+              const containerAR = cw / ch;
+              const imageAR = iw / ih;
+              switch (settings.photoDisplayMode) {
+                case "maxWidthCrop":
+                  zoomScale = imageAR / containerAR;
+                  break;
+                case "maxHeightCrop":
+                  zoomScale = containerAR / imageAR;
+                  break;
+                default:
+                  zoomScale =
+                    containerAR > imageAR
+                      ? containerAR / imageAR
+                      : imageAR / containerAR;
+                  break;
               }
-            } else {
-              zoomScale =
-                containerAR > imageAR
-                  ? containerAR / imageAR
-                  : imageAR / containerAR;
             }
-          }
           const zoomDuration = Math.max(currentItem.duration / 1000 - 2, 0);
           style = {
             ...style,
