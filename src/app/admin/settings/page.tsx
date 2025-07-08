@@ -37,6 +37,10 @@ export default function SettingsPage() {
         try {
             const dbSettings = await getSettings();
             setSettings(dbSettings);
+            document.documentElement.classList.toggle('dark', dbSettings.theme === 'dark');
+            try {
+              localStorage.setItem('memboard-theme', dbSettings.theme);
+            } catch {}
         } catch (error) {
             console.error("Failed to load settings from database", error);
             toast({
@@ -66,13 +70,22 @@ export default function SettingsPage() {
   const handleSelectChange = (id: keyof Settings, value: string) => {
     setSettings((prev) => ({
       ...prev,
-      [id]: id === 'photoDisplayMode' ? value : Number(value),
+      [id]: id === 'photoDisplayMode' || id === 'theme' ? value : Number(value),
     }));
+    if (id === 'theme') {
+      document.documentElement.classList.toggle('dark', value === 'dark');
+      try {
+        localStorage.setItem('memboard-theme', value);
+      } catch {}
+    }
   };
 
   const handleSaveChanges = async () => {
     try {
       await saveSettings(settings);
+      try {
+        localStorage.setItem('memboard-theme', settings.theme);
+      } catch {}
       toast({
         title: 'Settings Saved',
         description: 'Your configuration has been updated successfully.',
@@ -89,6 +102,10 @@ export default function SettingsPage() {
   
   const handleResetToDefaults = () => {
     setSettings(defaultSettings);
+    document.documentElement.classList.toggle('dark', defaultSettings.theme === 'dark');
+    try {
+      localStorage.setItem('memboard-theme', defaultSettings.theme);
+    } catch {}
     toast({
         title: 'Settings Reset',
         description: 'Settings have been reset to their default values. Click "Save Changes" to apply.',
@@ -196,6 +213,16 @@ export default function SettingsPage() {
                     </span>
                 </Label>
                 <Switch id="monitorActivity" checked={settings.monitorActivity} onCheckedChange={(checked) => handleSwitchChange('monitorActivity', checked)} disabled={isDisabled}/>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="theme">Theme Mode</Label>
+                <Select value={settings.theme} onValueChange={(val) => handleSelectChange('theme', val)}>
+                    <SelectTrigger id="theme"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="light">Light</SelectItem>
+                        <SelectItem value="dark">Dark</SelectItem>
+                    </SelectContent>
+                </Select>
             </div>
             <div className="space-y-3">
                 <Label htmlFor="scrollSpeed">Message Scroll Speed ({settings.scrollSpeed}%)</Label>

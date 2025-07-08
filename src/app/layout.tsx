@@ -18,6 +18,11 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=PT+Sans:ital,wght@0,400;0,700;1,400;1,701&display=swap" rel="stylesheet" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(() => { try { const t = localStorage.getItem('memboard-theme') || 'light'; if (t === 'dark') document.documentElement.classList.add('dark'); } catch(e) {} })();`,
+          }}
+        />
       </head>
       <body className="font-body antialiased">
         {children}
