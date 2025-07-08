@@ -10,11 +10,13 @@ import { cn } from '@/lib/utils';
 export default function Home() {
   const [statusMessage, setStatusMessage] = useState('All systems normal.');
   const [isBlankScreen, setIsBlankScreen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const router = useRouter();
 
   useEffect(() => {
     const handler = (e: StorageEvent) => {
       if (e.key === 'memboard-settings-updated') {
+        setRefreshKey((k) => k + 1);
         router.refresh();
       }
     };
@@ -41,6 +43,7 @@ export default function Home() {
         <ViewHeader />
         <div className="flex-1 overflow-hidden">
           <DisplayBoard
+            key={refreshKey}
             onStatusChange={handleStatusChange}
             onBlankScreenChange={handleBlankScreenChange}
           />
