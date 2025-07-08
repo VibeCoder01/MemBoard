@@ -33,6 +33,13 @@ export type Settings = {
   photoDisplayMode: 'maxWidthCrop' | 'maxHeightCrop' | 'noCrop';
   photoZoomPercent: number;
   photoZoomDuration: number;
+  photoZoomCurve:
+    | 'linear'
+    | 'cubic'
+    | 'sigmoid'
+    | 'quadratic'
+    | 'exponential'
+    | 'logarithmic';
   morningStartHour: number;
   afternoonStartHour: number;
   eveningStartHour: number;
@@ -55,6 +62,7 @@ export const defaultSettings: Settings = {
   photoDisplayMode: 'maxWidthCrop',
   photoZoomPercent: 0,
   photoZoomDuration: 0,
+  photoZoomCurve: 'linear',
   morningStartHour: 6,
   afternoonStartHour: 12,
   eveningStartHour: 18,
