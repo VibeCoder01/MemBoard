@@ -260,9 +260,9 @@ export function DisplayBoard({
           </div>
         );
       case 'message':
-        const style = {
+        const messageStyle = {
           '--scroll-duration': `${currentItem.duration / 1000}s`,
-           fontSize: `${currentItem.fontSize}px`
+          fontSize: `${currentItem.fontSize}px`,
         } as React.CSSProperties;
 
         return (
@@ -270,7 +270,7 @@ export function DisplayBoard({
             <div className="relative h-full w-full overflow-hidden">
                <div
                 className="animate-scroll-message absolute flex h-full w-full flex-col justify-center text-center"
-                style={style}
+                style={messageStyle}
               >
                 <p className="font-body leading-normal text-foreground">
                   {currentItem.text}
