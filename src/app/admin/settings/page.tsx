@@ -147,6 +147,22 @@ export default function SettingsPage() {
                 <Label htmlFor="blankDuration">Blank Screen Pause (seconds)</Label>
                 <Input id="blankDuration" type="number" value={settings.blankDuration} onChange={handleInputChange} disabled={isDisabled}/>
             </div>
+            <div className="space-y-2">
+                <Label htmlFor="cyclePhotosCount">Photos per Cycle</Label>
+                <Input id="cyclePhotosCount" type="number" value={settings.cyclePhotosCount} onChange={handleInputChange} disabled={isDisabled}/>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="cycleRepeatCount">Cycle Repetitions</Label>
+                <Input id="cycleRepeatCount" type="number" value={settings.cycleRepeatCount} onChange={handleInputChange} disabled={isDisabled}/>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="photosOnlyMinutes">Photos-Only Duration (minutes)</Label>
+                <Input id="photosOnlyMinutes" type="number" value={settings.photosOnlyMinutes} onChange={handleInputChange} disabled={isDisabled}/>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="cycleBlankMinutes">Cycle Pause (minutes)</Label>
+                <Input id="cycleBlankMinutes" type="number" value={settings.cycleBlankMinutes} onChange={handleInputChange} disabled={isDisabled}/>
+            </div>
         </CardContent>
       </Card>
       <Card>

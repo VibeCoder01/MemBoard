@@ -142,9 +142,10 @@ export function DisplayBoard({
           onStatusChange("Initializing: Building display queue...");
         }
 
-        let contentItems: DisplayItem[] = [];
+        let photoItems: DisplayItem[] = [];
+        let messageItems: DisplayItem[] = [];
 
-        // 1. Add photos if enabled
+        // 1. Prepare photos if enabled
         if (
           loadedSettings.displayPhotos &&
           Object.keys(photoGroups).length > 0
@@ -166,7 +167,7 @@ export function DisplayBoard({
             }
             photoList = groupedList;
           }
-          const photoItems: DisplayItem[] = photoList
+          photoItems = photoList
             .filter((p) => p && p.src)
             .map((p) => ({
               type: "photo",
@@ -175,10 +176,9 @@ export function DisplayBoard({
               "data-ai-hint": p["data-ai-hint"],
               duration: (loadedSettings.photoDuration || 10) * 1000,
             }));
-          contentItems.push(...photoItems);
         }
 
-        // 2. Add messages if enabled
+        // 2. Prepare messages if enabled
         if (loadedSettings.displayMessages) {
           const activeMessages = messages.filter(
             (m) =>
@@ -190,35 +190,70 @@ export function DisplayBoard({
             const animationDistanceFactor = 2;
             return baseDuration * scrollFactor * animationDistanceFactor;
           };
-          const messageItems: DisplayItem[] = activeMessages.map((m) => ({
+          messageItems = activeMessages.map((m) => ({
             type: "message",
             text: m.content,
             duration: getMessageDuration(m.content),
             fontSize: loadedSettings.messageFontSize,
           }));
-          contentItems.push(...messageItems);
         }
 
-        // 3. Shuffle globally if enabled
         if (loadedSettings.randomize) {
-          contentItems = shuffle(contentItems);
+          photoItems = shuffle(photoItems);
+          messageItems = shuffle(messageItems);
         }
 
-        // 4. Build final queue with blank screens
+        // Build final queue following the pattern
         const finalQueue: DisplayItem[] = [];
-        if (contentItems.length > 0) {
-          contentItems.forEach((item, index) => {
-            finalQueue.push(item);
-            if (
-              loadedSettings.useBlankScreens &&
-              loadedSettings.blankDuration > 0 &&
-              index < contentItems.length - 1
-            ) {
-              finalQueue.push({
-                type: "blank",
-                duration: (loadedSettings.blankDuration || 3) * 1000,
-              });
-            }
+        const useBlank =
+          loadedSettings.useBlankScreens && loadedSettings.blankDuration > 0;
+        const blankItem: DisplayItem = {
+          type: "blank",
+          duration: (loadedSettings.blankDuration || 3) * 1000,
+        };
+
+        const pushItem = (item: DisplayItem) => {
+          finalQueue.push(item);
+          if (useBlank) {
+            finalQueue.push({ ...blankItem });
+          }
+        };
+
+        let photoIndex = 0;
+
+        for (let t = 0; t < loadedSettings.cycleRepeatCount; t++) {
+          messageItems.forEach((m) => pushItem(m));
+          for (
+            let i = 0;
+            i < loadedSettings.cyclePhotosCount && photoItems.length > 0;
+            i++
+          ) {
+            pushItem(photoItems[photoIndex % photoItems.length]);
+            photoIndex++;
+          }
+        }
+
+        // Photos for M minutes
+        let remainingMs = loadedSettings.photosOnlyMinutes * 60 * 1000;
+        while (photoItems.length > 0 && remainingMs > 0) {
+          const p = photoItems[photoIndex % photoItems.length];
+          pushItem(p);
+          remainingMs -= p.duration;
+          photoIndex++;
+        }
+
+        // Remove trailing short blank if present before adding long blank
+        if (useBlank && finalQueue.length > 0) {
+          const last = finalQueue[finalQueue.length - 1];
+          if (last.type === "blank" && last.duration === blankItem.duration) {
+            finalQueue.pop();
+          }
+        }
+
+        if (loadedSettings.cycleBlankMinutes > 0) {
+          finalQueue.push({
+            type: "blank",
+            duration: loadedSettings.cycleBlankMinutes * 60 * 1000,
           });
         }
 
