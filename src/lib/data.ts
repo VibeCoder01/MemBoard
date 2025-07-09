@@ -45,6 +45,10 @@ export type Settings = {
   eveningStartHour: number;
   nightStartHour: number;
   theme: 'light' | 'dark';
+  cyclePhotosCount: number; // N
+  cycleRepeatCount: number; // T
+  photosOnlyMinutes: number; // M
+  cycleBlankMinutes: number; // B
 };
 
 export const defaultSettings: Settings = {
@@ -67,4 +71,8 @@ export const defaultSettings: Settings = {
   eveningStartHour: 18,
   nightStartHour: 22,
   theme: 'light',
+  cyclePhotosCount: 5,
+  cycleRepeatCount: 1,
+  photosOnlyMinutes: 1,
+  cycleBlankMinutes: 1,
 };
