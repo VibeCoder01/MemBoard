@@ -258,12 +258,19 @@ export default function SettingsPage() {
                                       }
                                       onCheckedChange={(checked) =>
                                           setSettings((prev) => {
-                                              const selected = prev.enabledPhotoCategories || [];
+                                              const allCats = Object.keys(photoGroups).sort();
+                                              let selected =
+                                                  prev.enabledPhotoCategories && prev.enabledPhotoCategories.length > 0
+                                                      ? prev.enabledPhotoCategories
+                                                      : allCats;
                                               let newSelected = selected;
                                               if (checked) {
                                                   newSelected = Array.from(new Set([...selected, cat]));
                                               } else {
                                                   newSelected = selected.filter((c) => c !== cat);
+                                              }
+                                              if (newSelected.length === allCats.length) {
+                                                  newSelected = [];
                                               }
                                               return { ...prev, enabledPhotoCategories: newSelected };
                                           })
