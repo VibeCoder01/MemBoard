@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -22,37 +23,46 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import type { Settings } from '@/lib/data';
+import type { Settings, PhotoGroups } from '@/lib/data';
 import { defaultSettings } from '@/lib/data';
 import { getSettings, saveSettings } from '@/lib/settings-db';
+import { getPhotoGroups } from '@/lib/photo-db';
 import { triggerViewRefresh } from '@/lib/utils';
 
 export default function SettingsPage() {
   const { toast } = useToast();
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [isLoading, setIsLoading] = useState(true);
+  const [photoGroups, setPhotoGroups] = useState<PhotoGroups>({});
 
   useEffect(() => {
-    const fetchSettings = async () => {
-        setIsLoading(true);
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const [dbSettings, groups] = await Promise.all([
+          getSettings(),
+          getPhotoGroups(),
+        ]);
+        setSettings(dbSettings);
+        setPhotoGroups(groups);
+        document.documentElement.classList.toggle(
+          'dark',
+          dbSettings.theme === 'dark',
+        );
         try {
-            const dbSettings = await getSettings();
-            setSettings(dbSettings);
-            document.documentElement.classList.toggle('dark', dbSettings.theme === 'dark');
-            try {
-              localStorage.setItem('memboard-theme', dbSettings.theme);
-            } catch {}
-        } catch (error) {
-            console.error("Failed to load settings from database", error);
-            toast({
-                variant: 'destructive',
-                title: 'Error',
-                description: 'Could not load saved settings. Using defaults.',
-            });
-        }
-        setIsLoading(false);
-    }
-    fetchSettings();
+          localStorage.setItem('memboard-theme', dbSettings.theme);
+        } catch {}
+      } catch (error) {
+        console.error('Failed to load settings from database', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Could not load saved settings. Using defaults.',
+        });
+      }
+      setIsLoading(false);
+    };
+    fetchData();
   }, [toast]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -218,7 +228,7 @@ export default function SettingsPage() {
                 </Label>
                 <Switch id="randomizeAllPhotos" checked={settings.randomizeAllPhotos} onCheckedChange={(checked) => handleSwitchChange('randomizeAllPhotos', checked)} disabled={isDisabled}/>
             </div>
-             <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between">
                 <Label htmlFor="randomizeInPhotoGroups" className="flex flex-col space-y-1">
                     <span>Randomize Within Photo Groups</span>
                     <span className="font-normal leading-snug text-muted-foreground">
@@ -226,8 +236,46 @@ export default function SettingsPage() {
                     </span>
                 </Label>
                 <Switch id="randomizeInPhotoGroups" checked={settings.randomizeInPhotoGroups} onCheckedChange={(checked) => handleSwitchChange('randomizeInPhotoGroups', checked)} disabled={isDisabled}/>
-            </div>
-            <div className="flex items-center justify-between">
+              </div>
+              <div className="space-y-1">
+                  <Label className="flex flex-col space-y-1">
+                      <span>Visible Photo Categories</span>
+                      <span className="font-normal leading-snug text-muted-foreground">
+                          Choose which categories appear in the rotation.
+                      </span>
+                  </Label>
+                  <div className="flex flex-col gap-2 pl-4">
+                      {Object.keys(photoGroups).length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No categories available.</p>
+                      ) : (
+                          Object.keys(photoGroups).sort().map((cat) => (
+                              <div key={cat} className="flex items-center gap-2">
+                                  <Checkbox
+                                      id={`cat-${cat}`}
+                                      checked={
+                                          settings.enabledPhotoCategories.length === 0 ||
+                                          settings.enabledPhotoCategories.includes(cat)
+                                      }
+                                      onCheckedChange={(checked) =>
+                                          setSettings((prev) => {
+                                              const selected = prev.enabledPhotoCategories || [];
+                                              let newSelected = selected;
+                                              if (checked) {
+                                                  newSelected = Array.from(new Set([...selected, cat]));
+                                              } else {
+                                                  newSelected = selected.filter((c) => c !== cat);
+                                              }
+                                              return { ...prev, enabledPhotoCategories: newSelected };
+                                          })
+                                      }
+                                  />
+                                  <Label htmlFor={`cat-${cat}`}>{cat}</Label>
+                              </div>
+                          ))
+                      )}
+                  </div>
+              </div>
+              <div className="flex items-center justify-between">
                 <Label htmlFor="monitorActivity" className="flex flex-col space-y-1">
                     <span>Monitor Activity</span>
                     <span className="font-normal leading-snug text-muted-foreground">
