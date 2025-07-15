@@ -25,6 +25,7 @@ export type Settings = {
   scrollSpeed: number;
   randomizeAllPhotos: boolean;
   randomizeInPhotoGroups: boolean;
+  enabledPhotoCategories: string[];
   messageFontSize: number;
   displayPhotos: boolean;
   displayMessages: boolean;
@@ -58,6 +59,7 @@ export const defaultSettings: Settings = {
   scrollSpeed: 50,
   randomizeAllPhotos: false,
   randomizeInPhotoGroups: true,
+  enabledPhotoCategories: [],
   messageFontSize: 48,
   displayPhotos: true,
   displayMessages: true,

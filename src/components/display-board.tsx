@@ -150,15 +150,22 @@ export function DisplayBoard({
           loadedSettings.displayPhotos &&
           Object.keys(photoGroups).length > 0
         ) {
-          let photoList: Photo[] = Object.values(photoGroups)
-            .flat()
-            .filter((p) => p && p.src);
+          const selectedCategories =
+            loadedSettings.enabledPhotoCategories?.length > 0
+              ? loadedSettings.enabledPhotoCategories
+              : Object.keys(photoGroups);
+          let photoList: Photo[] = [];
           if (loadedSettings.randomizeAllPhotos) {
+            photoList = Object.entries(photoGroups)
+              .filter(([c]) => selectedCategories.includes(c))
+              .flatMap(([, photos]) => photos)
+              .filter((p) => p && p.src);
             photoList = shuffle(photoList);
           } else {
             const groupedList: Photo[] = [];
             const categories = Object.keys(photoGroups).sort();
             for (const category of categories) {
+              if (!selectedCategories.includes(category)) continue;
               let groupPhotos = photoGroups[category] || [];
               if (loadedSettings.randomizeInPhotoGroups) {
                 groupPhotos = shuffle(groupPhotos);
